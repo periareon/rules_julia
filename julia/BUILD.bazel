@@ -1,0 +1,29 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("//julia/private:toolchain.bzl", "current_julia_toolchain")
+
+exports_files(glob(["*.bzl"]))
+
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+bzl_library(
+    name = "defs_bzl",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//julia/pkg:defs_bzl",
+        "//julia/private:bzl_lib",
+    ],
+)
+
+current_julia_toolchain(
+    name = "current_julia_toolchain",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "format",
+    actual = "//julia/private/format:format_fixer",
+)

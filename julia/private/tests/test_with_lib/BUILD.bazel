@@ -1,0 +1,7 @@
+load("//julia:julia_test.bzl", "julia_test")
+
+julia_test(
+    name = "writelib_test",
+    srcs = ["writelib_test.jl"],
+    deps = ["//julia/private/tests/library:writelib"],
+)

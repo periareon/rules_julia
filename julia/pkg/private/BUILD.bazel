@@ -1,0 +1,27 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("//julia:julia_binary.bzl", "julia_binary")
+
+bzl_library(
+    name = "bazel_tools_bzl_lib",
+    srcs = ["@bazel_tools//tools:bzl_srcs"],
+)
+
+bzl_library(
+    name = "bzl_lib",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//julia/pkg:__pkg__"],
+    deps = [":bazel_tools_bzl_lib"],
+)
+
+julia_binary(
+    name = "pkg_compiler",
+    srcs = ["pkg_compiler.jl"],
+    visibility = ["//visibility:public"],
+)
+
+julia_binary(
+    name = "pkg_tester",
+    srcs = ["pkg_tester.jl"],
+    visibility = ["//visibility:public"],
+    deps = ["//julia/runfiles"],
+)

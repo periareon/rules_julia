@@ -1,0 +1,7 @@
+load("//julia:julia_library.bzl", "julia_library")
+
+julia_library(
+    name = "writelib",
+    srcs = ["src/writelib.jl"],
+    visibility = ["//julia/private/tests:__subpackages__"],
+)

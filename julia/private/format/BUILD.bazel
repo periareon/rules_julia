@@ -1,0 +1,31 @@
+load("//julia/private:julia.bzl", "julia_binary")
+
+exports_files([
+    "Project.toml",
+    "Manifest.toml",
+    "Manifest.bazel.json",
+])
+
+julia_binary(
+    name = "format_checker",
+    srcs = ["src/format_checker.jl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//julia/runfiles",
+        "@rules_julia_fmt//:JuliaFormatter",
+    ],
+)
+
+julia_binary(
+    name = "format_fixer",
+    srcs = ["src/format_fixer.jl"],
+    data = ["//julia/settings:julia_formatter_config"],
+    env = {
+        "JULIA_FORMATTER_CONFIG_PATH": "$(rlocationpath //julia/settings:julia_formatter_config)",
+    },
+    visibility = ["//visibility:public"],
+    deps = [
+        "//julia/runfiles",
+        "@rules_julia_fmt//:JuliaFormatter",
+    ],
+)

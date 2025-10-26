@@ -1,0 +1,7 @@
+load("//julia:julia_library.bzl", "julia_library")
+
+julia_library(
+    name = "math_utils",
+    srcs = ["src/math_utils.jl"],
+    visibility = ["//julia/private/tests:__subpackages__"],
+)

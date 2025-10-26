@@ -1,0 +1,13 @@
+load("//julia:julia_library.bzl", "julia_library")
+
+julia_library(
+    name = "Runfiles",
+    srcs = ["src/Runfiles.jl"],
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "runfiles",
+    actual = ":Runfiles",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,39 @@
+load("//julia:julia_binary.bzl", "julia_binary")
+load("//julia:julia_library.bzl", "julia_library")
+load("//julia:julia_test.bzl", "julia_test")
+load("//julia/private:format.bzl", "julia_format_test")
+
+# Test library target
+julia_library(
+    name = "test_lib",
+    srcs = ["library/src/test_lib.jl"],
+    visibility = ["//julia/private/tests:__subpackages__"],
+)
+
+# Test binary target
+julia_binary(
+    name = "test_bin",
+    srcs = ["binary/test_bin.jl"],
+)
+
+# Test test target
+julia_test(
+    name = "test_target",
+    srcs = ["test/test_target.jl"],
+)
+
+# Format tests
+julia_format_test(
+    name = "format_library_test",
+    target = ":test_lib",
+)
+
+julia_format_test(
+    name = "format_binary_test",
+    target = ":test_bin",
+)
+
+julia_format_test(
+    name = "format_test_target_test",
+    target = ":test_target",
+)

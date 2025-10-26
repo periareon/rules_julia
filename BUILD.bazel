@@ -1,0 +1,4 @@
+exports_files([
+    "MODULE.bazel",
+    "version.bzl",
+])

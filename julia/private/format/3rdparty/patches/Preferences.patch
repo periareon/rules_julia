@@ -1,0 +1,18 @@
+diff --git a/src/Preferences.jl b/src/Preferences.jl
+index 1065b71..9a58186 100644
+--- a/src/Preferences.jl
++++ b/src/Preferences.jl
+@@ -391,11 +391,13 @@ macro delete_preferences!(prefs...)
+ end
+ 
+ # Precompilation to reduce latency (https://github.com/JuliaLang/julia/pull/43990#issuecomment-1025692379)
++if haskey(ENV, "JULIA_PKG_PREFERENCES_FORCE_PRECOMPILE")
+ get_uuid(Preferences)
+ currently_compiling()
+ precompile(Tuple{typeof(drop_clears), Any})
+ if hasmethod(Base.BinaryPlatforms.Platform, (String, String, Dict{String}))
+     precompile(load_preference, (Base.UUID, String, Nothing))
+ end
++end
+ 
+ end # module Preferences

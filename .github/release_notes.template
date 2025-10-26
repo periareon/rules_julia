@@ -1,0 +1,7 @@
+# {version}
+
+```python
+bazel_dep(name = "rules_julia", version = "{version}")
+```
+
+Additional documentation can be found at: https://periareon.github.io/rules_julia/

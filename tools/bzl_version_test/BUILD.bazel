@@ -1,0 +1,13 @@
+load("//:version.bzl", "VERSION")
+load("//julia:julia_test.bzl", "julia_test")
+
+julia_test(
+    name = "bzl_version_test",
+    srcs = ["bzl_version_test.jl"],
+    data = ["//:MODULE.bazel"],
+    env = {
+        "MODULE_BAZEL": "$(rlocationpath //:MODULE.bazel)",
+        "VERSION": VERSION,
+    },
+    deps = ["//julia/runfiles"],
+)

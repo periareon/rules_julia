@@ -1,0 +1,68 @@
+{
+  "CommonMark": {
+    "deps": [
+      "PrecompileTools"
+    ],
+    "sha256": "6c885f40fdc1325b38391086651139e560b41bfb2dd08e429003a09c7e75fbd7",
+    "urls": [
+      "https://pkg.julialang.org/package/a80b9123-70ca-4bc0-993e-6e3bcb318db6/351d6f4eaf273b753001b2de4dffb8279b100769"
+    ],
+    "uuid": "a80b9123-70ca-4bc0-993e-6e3bcb318db6",
+    "version": "0.9.1"
+  },
+  "Glob": {
+    "deps": [],
+    "sha256": "57fc878074eca976348fdd706b8a9c033baf74ea5433f5d3e0a4de4b068b9475",
+    "urls": [
+      "https://pkg.julialang.org/package/c27321d9-0574-5035-807b-f59d2c89b15c/97285bbd5230dd766e9ef6749b80fc617126d496"
+    ],
+    "uuid": "c27321d9-0574-5035-807b-f59d2c89b15c",
+    "version": "1.3.1"
+  },
+  "JuliaFormatter": {
+    "deps": [
+      "CommonMark",
+      "Glob",
+      "JuliaSyntax",
+      "PrecompileTools",
+      "TOML"
+    ],
+    "sha256": "d3be7c1fde50d3777c3c7983805734ce9d90caf03ce2baa7b9bb4bddebfd2d57",
+    "urls": [
+      "https://pkg.julialang.org/package/98e50ef6-434e-11e9-1051-2b60c6c9e899/f512fefd5fdc7dd1ca05778f08f91e9e4c9fdc37"
+    ],
+    "uuid": "98e50ef6-434e-11e9-1051-2b60c6c9e899",
+    "version": "2.1.6"
+  },
+  "JuliaSyntax": {
+    "deps": [],
+    "sha256": "33e59fee18e7bc34f6612a8b9ca3f86b62bb238ab1b2b971e9fb6d2da23c54d6",
+    "urls": [
+      "https://pkg.julialang.org/package/70703baa-626e-46a2-a12c-08ffd08c73b4/937da4713526b96ac9a178e2035019d3b78ead4a"
+    ],
+    "uuid": "70703baa-626e-46a2-a12c-08ffd08c73b4",
+    "version": "0.4.10"
+  },
+  "PrecompileTools": {
+    "deps": [
+      "Preferences"
+    ],
+    "sha256": "aba33f79f62a7bb1b4590b61586b7c4dd703d989360255244d33d8ab81a794d9",
+    "urls": [
+      "https://pkg.julialang.org/package/aea7be01-6a6a-4083-8856-8a6e6704d82a/5aa36f7049a63a1528fe8f7c3f2113413ffd4e1f"
+    ],
+    "uuid": "aea7be01-6a6a-4083-8856-8a6e6704d82a",
+    "version": "1.2.1"
+  },
+  "Preferences": {
+    "deps": [
+      "TOML"
+    ],
+    "sha256": "374bfd40e98e3b5073ef9d7ad63b1109bb68a1d8c0a9f3dbe449430ec51e9891",
+    "urls": [
+      "https://pkg.julialang.org/package/21216c6a-2e73-6563-6e65-726566657250/0f27480397253da18fe2c12a4ba4eb9eb208bf3d"
+    ],
+    "uuid": "21216c6a-2e73-6563-6e65-726566657250",
+    "version": "1.5.0"
+  }
+}

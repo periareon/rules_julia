@@ -1,0 +1,23 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//julia:julia_test.bzl", "julia_test")
+
+write_file(
+    name = "generated_file",
+    out = "generated_data.txt",
+    content = ["La-Li-Lu-Le-Lo"],
+    newline = "unix",
+)
+
+julia_test(
+    name = "runfiles_test",
+    srcs = ["runfiles_test.jl"],
+    data = [
+        "data.txt",
+        ":generated_data.txt",
+    ],
+    env = {
+        "DATA_RLOCATIONPATH": "$(rlocationpath data.txt)",
+        "GENERATED_DATA_RLOCATIONPATH": "$(rlocationpath :generated_data.txt)",
+    },
+    deps = ["//julia/runfiles"],
+)

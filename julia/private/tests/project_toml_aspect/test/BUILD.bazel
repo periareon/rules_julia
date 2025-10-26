@@ -1,0 +1,139 @@
+load("//julia:julia_test.bzl", "julia_test")
+load(":project_toml_test_rule.bzl", "diff_test", "julia_project_toml_test_rule")
+
+exports_files([
+    "diff_test.jl",
+])
+
+# Rule that runs the aspect on consumer targets and provides output groups
+julia_project_toml_test_rule(
+    name = "project_toml_test",
+    targets = [
+        "//julia/private/tests/project_toml_aspect/consumer:multi_deps_test",
+        "//julia/private/tests/project_toml_aspect/math_utils",
+        "//julia/private/tests/project_toml_aspect/string_utils",
+        "//julia/private/tests/project_toml_aspect/calc_utils",
+    ],
+)
+
+# Filegroup to access the generated Project.toml for the main consumer
+filegroup(
+    name = "multi_deps_test_project_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_project_toml_test_multi_deps_test",
+)
+
+# Filegroup to access the generated Project.toml for math_utils
+filegroup(
+    name = "math_utils_project_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_project_toml_test_math_utils",
+)
+
+# Filegroup to access the generated Project.toml for string_utils
+filegroup(
+    name = "string_utils_project_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_project_toml_test_string_utils",
+)
+
+# Filegroup to access the generated Project.toml for calc_utils
+filegroup(
+    name = "calc_utils_project_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_project_toml_test_calc_utils",
+)
+
+# Filegroup to access the generated Manifest.toml for the main consumer
+filegroup(
+    name = "multi_deps_test_manifest_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_manifest_toml_test_multi_deps_test",
+)
+
+# Filegroup to access the generated Manifest.toml for math_utils
+filegroup(
+    name = "math_utils_manifest_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_manifest_toml_test_math_utils",
+)
+
+# Filegroup to access the generated Manifest.toml for string_utils
+filegroup(
+    name = "string_utils_manifest_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_manifest_toml_test_string_utils",
+)
+
+# Filegroup to access the generated Manifest.toml for calc_utils
+filegroup(
+    name = "calc_utils_manifest_toml",
+    srcs = [":project_toml_test"],
+    output_group = "julia_manifest_toml_test_calc_utils",
+)
+
+# Diff tests to verify the generated Project.toml files match expected content
+diff_test(
+    name = "multi_deps_test_project_toml_diff",
+    file1 = ":multi_deps_test.Project.toml",
+    file2 = ":multi_deps_test_project_toml",
+)
+
+diff_test(
+    name = "math_utils_project_toml_diff",
+    file1 = ":math_utils.Project.toml",
+    file2 = ":math_utils_project_toml",
+)
+
+diff_test(
+    name = "string_utils_project_toml_diff",
+    file1 = ":string_utils.Project.toml",
+    file2 = ":string_utils_project_toml",
+)
+
+diff_test(
+    name = "calc_utils_project_toml_diff",
+    file1 = ":calc_utils.Project.toml",
+    file2 = ":calc_utils_project_toml",
+)
+
+# Diff tests to verify the generated Manifest.toml files match expected content
+diff_test(
+    name = "multi_deps_test_manifest_toml_diff",
+    file1 = ":multi_deps_test.Manifest.toml",
+    file2 = ":multi_deps_test_manifest_toml",
+)
+
+diff_test(
+    name = "math_utils_manifest_toml_diff",
+    file1 = ":math_utils.Manifest.toml",
+    file2 = ":math_utils_manifest_toml",
+)
+
+diff_test(
+    name = "string_utils_manifest_toml_diff",
+    file1 = ":string_utils.Manifest.toml",
+    file2 = ":string_utils_manifest_toml",
+)
+
+diff_test(
+    name = "calc_utils_manifest_toml_diff",
+    file1 = ":calc_utils.Manifest.toml",
+    file2 = ":calc_utils_manifest_toml",
+)
+
+# Test to validate that dependency paths in Project.toml files exist
+julia_test(
+    name = "project_toml_path_validation_test",
+    srcs = ["project_toml_path_validation_test.jl"],
+    data = [
+        "calc_utils.Project.toml",
+        "math_utils.Project.toml",
+        "multi_deps_test.Project.toml",
+        "string_utils.Project.toml",
+    ],
+    env = {
+        "PROJECT_TOML": "$(rlocationpath multi_deps_test.Project.toml)",
+    },
+    deps = ["//julia/runfiles"],
+)

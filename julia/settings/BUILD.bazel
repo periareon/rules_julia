@@ -1,0 +1,21 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(
+    ":settings.bzl",
+    "experimental_entrypoint_use_include",
+    "julia_formatter_config",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+bzl_library(
+    name = "settings_bzl",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//julia/private:__pkg__"],
+    deps = [
+        "@bazel_skylib//rules:common_settings",
+    ],
+)
+
+experimental_entrypoint_use_include()
+
+julia_formatter_config()

@@ -1,0 +1,62 @@
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//julia:julia_binary.bzl", "julia_binary")
+
+julia_binary(
+    name = "multi_deps_test",
+    srcs = ["src/multi_deps_test.jl"],
+    visibility = ["//julia/private/tests/project_toml_aspect/test:__pkg__"],
+    deps = [
+        "//julia/private/tests/project_toml_aspect/calc_utils",
+        "//julia/private/tests/project_toml_aspect/math_utils",
+        "//julia/private/tests/project_toml_aspect/string_utils",
+    ],
+)
+
+# Test that the underlying binary still works
+run_binary(
+    name = "multi_deps_output",
+    outs = ["multi_deps_output.txt"],
+    args = [
+        "--output",
+        "$(execpath :multi_deps_output.txt)",
+    ],
+    tool = ":multi_deps_test",
+)
+
+write_file(
+    name = "multi_deps_expected",
+    out = "multi_deps_expected.txt",
+    content = [
+        "=== Multi Dependencies Test ===",
+        "Testing math_utils:",
+        "5 + 3 = 8",
+        "4 * 7 = 28",
+        "Pi ≈ 3.14159",
+        "",
+        "Testing string_utils:",
+        "Greeting: Hello, World!",
+        "'Hello' reversed: olleH",
+        "Word count: 5",
+        "String utils version: 1.0.0",
+        "",
+        "Testing calc_utils (transitive dependency):",
+        "Area of 5x3 rectangle: 15",
+        "Perimeter of 5x3 rectangle: 16",
+        "Circle with radius 2 - Area: 12.56636, Circumference: 12.56636",
+        "",
+        "Combined test:",
+        "Combined result: 9",
+        "",
+        "=== Test completed successfully! ===",
+        "",
+    ],
+    newline = "unix",
+)
+
+diff_test(
+    name = "multi_deps_diff_test",
+    file1 = ":multi_deps_expected.txt",
+    file2 = ":multi_deps_output.txt",
+)

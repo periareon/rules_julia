@@ -1,0 +1,7 @@
+load("//julia/private:julia.bzl", "julia_binary")
+
+julia_binary(
+    name = "project_toml_generator",
+    srcs = ["src/project_toml_generator.jl"],
+    visibility = ["//visibility:public"],
+)

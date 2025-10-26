@@ -1,0 +1,27 @@
+load("//julia:julia_binary.bzl", "julia_binary")
+
+exports_files([
+    "Project.toml",
+    "Manifest.toml",
+    "Manifest.bazel.json",
+    "standalone_wrapper.sh.tpl",
+    "standalone_wrapper.bat.tpl",
+])
+
+alias(
+    name = "standalone_wrapper.tpl",
+    actual = select({
+        "@platforms//os:windows": "standalone_wrapper.bat.tpl",
+        "//conditions:default": "standalone_wrapper.sh.tpl",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+julia_binary(
+    name = "standalone_compiler",
+    srcs = ["src/standalone_compiler.jl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@rules_julia_sac//:PackageCompiler",
+    ],
+)

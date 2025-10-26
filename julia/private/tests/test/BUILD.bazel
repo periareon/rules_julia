@@ -1,0 +1,6 @@
+load("//julia:julia_test.bzl", "julia_test")
+
+julia_test(
+    name = "hash_test",
+    srcs = ["hash_test.jl"],
+)
