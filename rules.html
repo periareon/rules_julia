@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>rules - rules_julia</title>
+        <title>Rules - rules_julia</title>
 
 
         <!-- Custom HTML head -->
@@ -156,7 +156,7 @@
                 <div id="content" class="content">
                     <main>
                         <!-- Generated with Stardoc: http://skydoc.bazel.build -->
-<p>Julia Bazel rules</p>
+<h1 id="julia-bazel-rules"><a class="header" href="#julia-bazel-rules">Julia Bazel rules</a></h1>
 <h2 id="rules"><a class="header" href="#rules">Rules</a></h2>
 <ul>
 <li><a href="#julia_binary">julia_binary</a></li>
@@ -169,6 +169,10 @@
 <h2 id="aspects"><a class="header" href="#aspects">Aspects</a></h2>
 <ul>
 <li><a href="#julia_format_aspect">julia_format_aspect</a></li>
+</ul>
+<h2 id="module-extensions"><a class="header" href="#module-extensions">Module Extensions</a></h2>
+<ul>
+<li><a href="#julia">julia</a></li>
 </ul>
 <p><a id="julia_binary"></a></p>
 <h2 id="julia_binary"><a class="header" href="#julia_binary">julia_binary</a></h2>
@@ -233,13 +237,14 @@ distributed and run on machines without Julia installed.</p>
 <p>Dependencies are provided hermetically through Bazel - no network access required!
 PackageCompiler.jl and all Julia package dependencies are managed through the
 Bazel build system.</p>
-<p>Example:
-julia_binary(
-name = "my_app_bin",
-srcs = ["my_app.jl"],
-deps = ["//my/lib"],
-)</p>
-<pre><code>julia_standalone_binary(
+<p>Example:</p>
+<pre><code class="language-python">julia_binary(
+    name = "my_app_bin",
+    srcs = ["my_app.jl"],
+    deps = ["//my/lib"],
+)
+
+julia_standalone_binary(
     name = "my_app",
     binary = ":my_app_bin",
 )
@@ -292,7 +297,23 @@ julia_format_aspect()
 <p>An aspect for running JuliaFormatter on targets with Julia sources.</p>
 <p><strong>ASPECT ATTRIBUTES</strong></p>
 <p><strong>ATTRIBUTES</strong></p>
-
+<p><a id="julia"></a></p>
+<h2 id="julia"><a class="header" href="#julia">julia</a></h2>
+<pre>
+julia = use_extension("@rules_julia//julia:defs.bzl", "julia")
+julia.toolchain(<a href="#julia.toolchain-name">name</a>, <a href="#julia.toolchain-version">version</a>)
+</pre>
+<p>Bzlmod extensions for Julia</p>
+<p><strong>TAG CLASSES</strong></p>
+<p><a id="julia.toolchain"></a></p>
+<h3 id="toolchain"><a class="header" href="#toolchain">toolchain</a></h3>
+<p>An extension for defining a <code>julia_toolchain</code> from a download archive.</p>
+<p><strong>Attributes</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia.toolchain-name"></a>name</td><td style="text-align: left">The name of the toolchain hub.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia.toolchain-version"></a>version</td><td style="text-align: left">The version of Julia to download.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"1.11.7"</code></td></tr>
+</tbody></table>
+</div>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
@@ -301,7 +322,7 @@ julia_format_aspect()
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="bzlmod.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="settings.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -315,7 +336,7 @@ julia_format_aspect()
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="bzlmod.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="settings.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

@@ -160,10 +160,17 @@
 <p>This repository implements Bazel rules for the <a href="https://julialang.org/">Julia programming language</a>.</p>
 <h2 id="setup"><a class="header" href="#setup">Setup</a></h2>
 <p>To begin using the rules, add the following to your <code>MODULE.bazel</code> file.</p>
-<pre><code class="language-bazel">bazel_dep(name = "rules_julia", version = "{version}")
+<pre><code class="language-python">bazel_dep(name = "rules_julia", version = "{version}")
+
+julia = use_extension("@rules_julia//julia:extensions.bzl", "julia")
+julia.toolchain(
+    name = "julia_toolchains",
+    version = "1.11.7",
+)
+use_repo(julia, "julia_toolchains")
 
 register_toolchains(
-    "@rules_julia//julia/toolchain",
+    "@julia_toolchains//:all",
 )
 </code></pre>
 

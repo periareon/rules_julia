@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>pkg - rules_julia</title>
+        <title>External Dependencies - rules_julia</title>
 
 
         <!-- Custom HTML head -->
@@ -156,7 +156,7 @@
                 <div id="content" class="content">
                     <main>
                         <!-- Generated with Stardoc: http://skydoc.bazel.build -->
-<p>Julia Pkg rules</p>
+<h1 id="julia-pkg-rules"><a class="header" href="#julia-pkg-rules">Julia Pkg rules</a></h1>
 <h2 id="rules"><a class="header" href="#rules">Rules</a></h2>
 <ul>
 <li><a href="#julia_pkg_compiler">julia_pkg_compiler</a></li>
@@ -183,10 +183,17 @@ file will be written next to the Manifest.toml file.</p>
 <p>Note that when setting this target up for the first time, an empty Manifest.toml file
 will need to be created. If you specify <code>manifest_bazel_json</code>, that file should also be
 created as an empty JSON object <code>{}</code>.</p>
-<p>Example:
-<code>starlark     julia_pkg_compiler(         name = "pkg_update",         project_toml = "Project.toml",         manifest_toml = "Manifest.toml",         # manifest_bazel_json is optional - defaults to Manifest.bazel.json next to Manifest.toml     )     </code></p>
-<p>Then run:
-<code>sh     bazel run //:pkg_update     </code></p>
+<p>Example:</p>
+<pre><code class="language-python">julia_pkg_compiler(
+    name = "pkg_update",
+    project_toml = "Project.toml",
+    manifest_toml = "Manifest.toml",
+    # manifest_bazel_json is optional - defaults to Manifest.bazel.json next to Manifest.toml
+)
+</code></pre>
+<p>Then run:</p>
+<pre><code class="language-sh">bazel run //:pkg_update
+</code></pre>
 <p>This will update Manifest.toml with resolved package versions and Manifest.bazel.json
 with SHA256 hashes for all packages and their dependency graph.</p>
 <p><strong>ATTRIBUTES</strong></p>
@@ -215,10 +222,16 @@ package versions, UUIDs, and dependencies that match the Manifest.toml file.</p>
 <li>The git-tree-sha1 is not in the package URL</li>
 <li>SHA256 hashes are missing</li>
 </ul>
-<p>Example:
-<code>starlark     julia_pkg_test(         name = "pkg_sync_test",         manifest_toml = "Manifest.toml",         manifest_bazel_json = "Manifest.bazel.json",     )     </code></p>
-<p>Then run:
-<code>sh     bazel test //:pkg_sync_test     </code></p>
+<p>Example:</p>
+<pre><code class="language-python">julia_pkg_test(
+    name = "pkg_sync_test",
+    manifest_toml = "Manifest.toml",
+    manifest_bazel_json = "Manifest.bazel.json",
+)
+</code></pre>
+<p>Then run:</p>
+<pre><code class="language-sh">bazel test //:pkg_sync_test
+</code></pre>
 <p>This will verify that both manifest files are synchronized. If they're out of sync,
 the test will fail with detailed error messages indicating what needs to be fixed.</p>
 <p><strong>ATTRIBUTES</strong></p>
@@ -260,7 +273,7 @@ pkg.pkg_annotation(<a href="#pkg.pkg_annotation-dep">dep</a>, <a href="#pkg.pkg_
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="bzlmod.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="settings.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -271,7 +284,7 @@ pkg.pkg_annotation(<a href="#pkg.pkg_annotation-dep">dep</a>, <a href="#pkg.pkg_
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="bzlmod.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="settings.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

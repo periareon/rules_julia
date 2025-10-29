@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>bzlmod - rules_julia</title>
+        <title>Settings - rules_julia</title>
 
 
         <!-- Custom HTML head -->
@@ -156,39 +156,30 @@
                 <div id="content" class="content">
                     <main>
                         <!-- Generated with Stardoc: http://skydoc.bazel.build -->
-<p>Julia Package Extensions</p>
-<h2 id="module-extensions"><a class="header" href="#module-extensions">Module Extensions</a></h2>
+<h1 id="julia-settings"><a class="header" href="#julia-settings">Julia settings</a></h1>
+<p>Definitions for all <code>@rules_julia//julia</code> settings</p>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <ul>
-<li><a href="#pkg">pkg</a></li>
+<li><a href="#experimental_entrypoint_use_include">experimental_entrypoint_use_include</a></li>
+<li><a href="#julia_formatter_config">julia_formatter_config</a></li>
 </ul>
-<p><a id="pkg"></a></p>
-<h2 id="pkg"><a class="header" href="#pkg">pkg</a></h2>
+<p><a id="experimental_entrypoint_use_include"></a></p>
+<h2 id="experimental_entrypoint_use_include"><a class="header" href="#experimental_entrypoint_use_include">experimental_entrypoint_use_include</a></h2>
 <pre>
-pkg = use_extension("@rules_julia//julia/pkg:extensions.bzl", "pkg")
-pkg.install(<a href="#pkg.install-name">name</a>, <a href="#pkg.install-lockfile">lockfile</a>, <a href="#pkg.install-manifest">manifest</a>)
-pkg.pkg_annotation(<a href="#pkg.pkg_annotation-dep">dep</a>, <a href="#pkg.pkg_annotation-patch_args">patch_args</a>, <a href="#pkg.pkg_annotation-patch_tool">patch_tool</a>, <a href="#pkg.pkg_annotation-patches">patches</a>)
+load("@rules_julia//julia/settings:settings.bzl", "experimental_entrypoint_use_include")
+
+experimental_entrypoint_use_include()
 </pre>
-<p>A module for defining Julia package dependencies.</p>
-<p><strong>TAG CLASSES</strong></p>
-<p><a id="pkg.install"></a></p>
-<h3 id="install"><a class="header" href="#install">install</a></h3>
-<p><strong>Attributes</strong></p>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a id="pkg.install-name"></a>name</td><td style="text-align: left">The name of the module to create</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="pkg.install-lockfile"></a>lockfile</td><td style="text-align: left">The Manifest.bazel.json lockfile with SHA256 hashes for all packages.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="pkg.install-manifest"></a>manifest</td><td style="text-align: left">The Manifest.toml lockfile associated with Project.toml (deprecated, use lockfile instead).</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
-</tbody></table>
-</div>
-<p><a id="pkg.pkg_annotation"></a></p>
-<h3 id="pkg_annotation"><a class="header" href="#pkg_annotation">pkg_annotation</a></h3>
-<p><strong>Attributes</strong></p>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a id="pkg.pkg_annotation-dep"></a>dep</td><td style="text-align: left">The name of the package to annotate</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="pkg.pkg_annotation-patch_args"></a>patch_args</td><td style="text-align: left">Arguments to pass to the patch tool. See http_archive.patch_args</td><td style="text-align: left">List of strings</td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
-<tr><td style="text-align: left"><a id="pkg.pkg_annotation-patch_tool"></a>patch_tool</td><td style="text-align: left">The patch tool to use. See http_archive.patch_tool</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>""</code></td></tr>
-<tr><td style="text-align: left"><a id="pkg.pkg_annotation-patches"></a>patches</td><td style="text-align: left">List of patch files to apply to the package. See http_archive.patches</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
-</tbody></table>
-</div>
+<p>A flag to control whether or not <code>julia_binary</code> and <code>julia_test</code> should use     <a href="https://docs.julialang.org/en/v1/base/base/#include"><code>include</code></a> vs <a href="https://docs.julialang.org/en/v1/base/base/#Base.run"><code>run</code></a>     to launch <code>main</code>.</p>
+<p><a id="julia_formatter_config"></a></p>
+<h2 id="julia_formatter_config"><a class="header" href="#julia_formatter_config">julia_formatter_config</a></h2>
+<pre>
+load("@rules_julia//julia/settings:settings.bzl", "julia_formatter_config")
+
+julia_formatter_config()
+</pre>
+<p>The <a href="https://domluna.github.io/JuliaFormatter.jl/stable/">JuliaFormatter</a> config file to use in formatting rules.</p>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
