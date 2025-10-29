@@ -158,25 +158,16 @@
                         <!-- Generated with Stardoc: http://skydoc.bazel.build -->
 <h1 id="julia-settings"><a class="header" href="#julia-settings">Julia settings</a></h1>
 <p>Definitions for all <code>@rules_julia//julia</code> settings</p>
-<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
-<ul>
-<li><a href="#experimental_entrypoint_use_include">experimental_entrypoint_use_include</a></li>
-<li><a href="#julia_formatter_config">julia_formatter_config</a></li>
-</ul>
 <p><a id="experimental_entrypoint_use_include"></a></p>
 <h2 id="experimental_entrypoint_use_include"><a class="header" href="#experimental_entrypoint_use_include">experimental_entrypoint_use_include</a></h2>
 <pre>
-load("@rules_julia//julia/settings:settings.bzl", "experimental_entrypoint_use_include")
-
-experimental_entrypoint_use_include()
+--@rules_julia//julia/settings:experimental_entrypoint_use_include
 </pre>
 <p>A flag to control whether or not <code>julia_binary</code> and <code>julia_test</code> should use     <a href="https://docs.julialang.org/en/v1/base/base/#include"><code>include</code></a> vs <a href="https://docs.julialang.org/en/v1/base/base/#Base.run"><code>run</code></a>     to launch <code>main</code>.</p>
 <p><a id="julia_formatter_config"></a></p>
 <h2 id="julia_formatter_config"><a class="header" href="#julia_formatter_config">julia_formatter_config</a></h2>
 <pre>
-load("@rules_julia//julia/settings:settings.bzl", "julia_formatter_config")
-
-julia_formatter_config()
+--@rules_julia//julia/settings:julia_formatter_config
 </pre>
 <p>The <a href="https://domluna.github.io/JuliaFormatter.jl/stable/">JuliaFormatter</a> config file to use in formatting rules.</p>
 
