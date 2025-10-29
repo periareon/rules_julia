@@ -1,0 +1,303 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>pkg - rules_julia</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">rules_julia</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/periareon/rules_julia" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Generated with Stardoc: http://skydoc.bazel.build -->
+<p>Julia Pkg rules</p>
+<h2 id="rules"><a class="header" href="#rules">Rules</a></h2>
+<ul>
+<li><a href="#julia_pkg_compiler">julia_pkg_compiler</a></li>
+<li><a href="#julia_pkg_test">julia_pkg_test</a></li>
+</ul>
+<h2 id="module-extensions"><a class="header" href="#module-extensions">Module Extensions</a></h2>
+<ul>
+<li><a href="#pkg">pkg</a></li>
+</ul>
+<p><a id="julia_pkg_compiler"></a></p>
+<h2 id="julia_pkg_compiler"><a class="header" href="#julia_pkg_compiler">julia_pkg_compiler</a></h2>
+<pre>
+load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_compiler")
+
+julia_pkg_compiler(<a href="#julia_pkg_compiler-name">name</a>, <a href="#julia_pkg_compiler-manifest_bazel_json">manifest_bazel_json</a>, <a href="#julia_pkg_compiler-manifest_toml">manifest_toml</a>, <a href="#julia_pkg_compiler-project_toml">project_toml</a>)
+</pre>
+<p>A rule for generating Manifest.toml and Manifest.bazel.json from Project.toml using Julia's Pkg manager.</p>
+<p>This rule uses Julia's native package manager to resolve dependencies and generate
+a Manifest.toml lockfile and a Manifest.bazel.json file with SHA256 hashes. The
+Manifest.bazel.json can then be used with the <code>pkg</code> module extension to fetch and
+build Julia packages hermetically with cryptographic verification.</p>
+<p>The <code>manifest_bazel_json</code> attribute is optional. If not specified, the Manifest.bazel.json
+file will be written next to the Manifest.toml file.</p>
+<p>Note that when setting this target up for the first time, an empty Manifest.toml file
+will need to be created. If you specify <code>manifest_bazel_json</code>, that file should also be
+created as an empty JSON object <code>{}</code>.</p>
+<p>Example:
+<code>starlark     julia_pkg_compiler(         name = "pkg_update",         project_toml = "Project.toml",         manifest_toml = "Manifest.toml",         # manifest_bazel_json is optional - defaults to Manifest.bazel.json next to Manifest.toml     )     </code></p>
+<p>Then run:
+<code>sh     bazel run //:pkg_update     </code></p>
+<p>This will update Manifest.toml with resolved package versions and Manifest.bazel.json
+with SHA256 hashes for all packages and their dependency graph.</p>
+<p><strong>ATTRIBUTES</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia_pkg_compiler-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_compiler-manifest_bazel_json"></a>manifest_bazel_json</td><td style="text-align: left">The location of the Manifest.bazel.json lockfile to generate/update with SHA256 hashes. If not specified, defaults to Manifest.bazel.json next to the manifest_toml file.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_compiler-manifest_toml"></a>manifest_toml</td><td style="text-align: left">The location of the Manifest.toml lockfile to generate/update.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_compiler-project_toml"></a>project_toml</td><td style="text-align: left">The <code>Project.toml</code> file describing dependencies.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+</tbody></table>
+</div>
+<p><a id="julia_pkg_test"></a></p>
+<h2 id="julia_pkg_test"><a class="header" href="#julia_pkg_test">julia_pkg_test</a></h2>
+<pre>
+load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_test")
+
+julia_pkg_test(<a href="#julia_pkg_test-name">name</a>, <a href="#julia_pkg_test-bazel_manifest">bazel_manifest</a>, <a href="#julia_pkg_test-julia_manifest">julia_manifest</a>)
+</pre>
+<p>A test rule that verifies Manifest.bazel.json is in sync with Manifest.toml.</p>
+<p>This test ensures that the lockfile generated by pkg_compiler contains the correct
+package versions, UUIDs, and dependencies that match the Manifest.toml file.</p>
+<p>The test will fail if:</p>
+<ul>
+<li>A package is missing from the lockfile</li>
+<li>Versions don't match between the two files</li>
+<li>UUIDs don't match</li>
+<li>The git-tree-sha1 is not in the package URL</li>
+<li>SHA256 hashes are missing</li>
+</ul>
+<p>Example:
+<code>starlark     julia_pkg_test(         name = "pkg_sync_test",         manifest_toml = "Manifest.toml",         manifest_bazel_json = "Manifest.bazel.json",     )     </code></p>
+<p>Then run:
+<code>sh     bazel test //:pkg_sync_test     </code></p>
+<p>This will verify that both manifest files are synchronized. If they're out of sync,
+the test will fail with detailed error messages indicating what needs to be fixed.</p>
+<p><strong>ATTRIBUTES</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia_pkg_test-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_test-bazel_manifest"></a>bazel_manifest</td><td style="text-align: left">The Manifest.bazel.json lockfile to verify.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_test-julia_manifest"></a>julia_manifest</td><td style="text-align: left">The Manifest.toml file to compare against.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+</tbody></table>
+</div>
+<p><a id="pkg"></a></p>
+<h2 id="pkg"><a class="header" href="#pkg">pkg</a></h2>
+<pre>
+pkg = use_extension("@rules_julia//julia/pkg:defs.bzl", "pkg")
+pkg.install(<a href="#pkg.install-name">name</a>, <a href="#pkg.install-lockfile">lockfile</a>, <a href="#pkg.install-manifest">manifest</a>)
+pkg.pkg_annotation(<a href="#pkg.pkg_annotation-dep">dep</a>, <a href="#pkg.pkg_annotation-patch_args">patch_args</a>, <a href="#pkg.pkg_annotation-patch_tool">patch_tool</a>, <a href="#pkg.pkg_annotation-patches">patches</a>)
+</pre>
+<p>A module for defining Julia package dependencies.</p>
+<p><strong>TAG CLASSES</strong></p>
+<p><a id="pkg.install"></a></p>
+<h3 id="install"><a class="header" href="#install">install</a></h3>
+<p><strong>Attributes</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="pkg.install-name"></a>name</td><td style="text-align: left">The name of the module to create</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="pkg.install-lockfile"></a>lockfile</td><td style="text-align: left">The Manifest.bazel.json lockfile with SHA256 hashes for all packages.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="pkg.install-manifest"></a>manifest</td><td style="text-align: left">The Manifest.toml lockfile associated with Project.toml (deprecated, use lockfile instead).</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
+</tbody></table>
+</div>
+<p><a id="pkg.pkg_annotation"></a></p>
+<h3 id="pkg_annotation"><a class="header" href="#pkg_annotation">pkg_annotation</a></h3>
+<p><strong>Attributes</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="pkg.pkg_annotation-dep"></a>dep</td><td style="text-align: left">The name of the package to annotate</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="pkg.pkg_annotation-patch_args"></a>patch_args</td><td style="text-align: left">Arguments to pass to the patch tool. See http_archive.patch_args</td><td style="text-align: left">List of strings</td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+<tr><td style="text-align: left"><a id="pkg.pkg_annotation-patch_tool"></a>patch_tool</td><td style="text-align: left">The patch tool to use. See http_archive.patch_tool</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>""</code></td></tr>
+<tr><td style="text-align: left"><a id="pkg.pkg_annotation-patches"></a>patches</td><td style="text-align: left">List of patch files to apply to the package. See http_archive.patches</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+</tbody></table>
+</div>
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="bzlmod.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="bzlmod.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
