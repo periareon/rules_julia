@@ -30,19 +30,47 @@ import Runfiles
     left_content = read(left_path, String)
     right_content = read(right_path, String)
 
-    # Compare contents
-    if left_content != right_content
+    # Split lines so that comparison works regardless of the newlines.
+    # This handles Unix (\n) vs Windows (\r\n) line endings
+    left_lines = split(left_content, '\n')
+    right_lines = split(right_content, '\n')
+
+    # Strip any remaining \r characters from line endings
+    left_lines = [rstrip(line, '\r') for line in left_lines]
+    right_lines = [rstrip(line, '\r') for line in right_lines]
+
+    # Reconstruct the strings with pure `\n` newlines for comparison
+    # This normalizes line endings across platforms
+    left_normalized = join(left_lines, '\n')
+    right_normalized = join(right_lines, '\n')
+
+    # Compare normalized contents
+    if left_normalized != right_normalized
         println(stderr, "Files differ!")
         println(stderr, "=" ^ 80)
         println(stderr, "LEFT_FILE ($left_path):")
         println(stderr, "-" ^ 80)
-        println(stderr, left_content)
+        println(stderr, left_normalized)
         println(stderr, "=" ^ 80)
         println(stderr, "RIGHT_FILE ($right_path):")
         println(stderr, "-" ^ 80)
-        println(stderr, right_content)
+        println(stderr, right_normalized)
         println(stderr, "=" ^ 80)
+
+        # Show line-by-line differences
+        println(stderr, "Line differences:")
+        println(stderr, "-" ^ 80)
+        max_lines = max(length(left_lines), length(right_lines))
+        for i = 1:max_lines
+            left_line = i <= length(left_lines) ? left_lines[i] : "<missing>"
+            right_line = i <= length(right_lines) ? right_lines[i] : "<missing>"
+            if left_line != right_line
+                println(stderr, "Line $i:")
+                println(stderr, "  LEFT:  $(repr(left_line))")
+                println(stderr, "  RIGHT: $(repr(right_line))")
+            end
+        end
     end
 
-    @test left_content == right_content
+    @test left_normalized == right_normalized
 end

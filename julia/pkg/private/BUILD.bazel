@@ -1,6 +1,8 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("//julia:julia_binary.bzl", "julia_binary")
 
+exports_files(["pkg_tester.jl"])
+
 bzl_library(
     name = "bazel_tools_bzl_lib",
     srcs = ["@bazel_tools//tools:bzl_srcs"],

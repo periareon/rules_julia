@@ -22,9 +22,7 @@ jobs:
         include:
           - os: macos-latest
           - os: ubuntu-24.04
-          # TODO: https://github.com/periareon/rules_julia/issues/1
-          # Add windows support
-          # - os: windows-2022
+          - os: windows-2022
     steps:
       # Checkout the code
       - uses: actions/checkout@v4

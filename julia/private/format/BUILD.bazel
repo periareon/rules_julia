@@ -4,6 +4,7 @@ exports_files([
     "Project.toml",
     "Manifest.toml",
     "Manifest.bazel.json",
+    "src/format_checker.jl",
 ])
 
 julia_binary(

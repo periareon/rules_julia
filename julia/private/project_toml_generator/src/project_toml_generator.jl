@@ -232,13 +232,15 @@ function main()
             Pkg.activate(".")
 
             for (dep_name, dep_path) in deps
-                relative_path = joinpath(path_prefix, dep_path)
+                relative_path = replace(joinpath(path_prefix, dep_path), '\\' => '/')
 
                 # Pkg.develop will normalize the path, so we need to predict what it will become
                 # and map it back to our original path
                 # Convert the relative path to an absolute path, then get the relative path from main_project_dir
                 abs_dep_path = abspath(joinpath(main_project_dir, relative_path))
-                normalized_path = relpath(abs_dep_path, main_project_dir)
+                # Normalize this path for Unix: replace `\` with `/`
+                normalized_path =
+                    replace(relpath(abs_dep_path, main_project_dir), '\\' => '/')
                 normalized_to_original[normalized_path] = relative_path
 
                 Pkg.develop(Pkg.PackageSpec(name = dep_name, path = relative_path))

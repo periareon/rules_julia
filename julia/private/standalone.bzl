@@ -3,13 +3,13 @@
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
-load(":julia.bzl", "JuliaInfo")
 load(
     ":project_toml_aspect.bzl",
     "JuliaProjectTomlInfo",
     "get_project_include",
     "julia_project_toml_aspect",
 )
+load(":providers.bzl", "JuliaInfo")
 load(":toolchain.bzl", "TOOLCHAIN_TYPE")
 
 def _rlocationpath(file, workspace_name):

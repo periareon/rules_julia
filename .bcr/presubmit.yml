@@ -1,9 +1,7 @@
 bcr_test_module:
   module_path: "."
   matrix:
-    # TODO: Add windows support
-    # https://github.com/periareon/rules_julia/issues/1
-    platform: ["macos_arm64", "ubuntu2004"]
+    platform: ["macos_arm64", "ubuntu2004", "windows"]
     bazel: [7.x, 8.x]
   tasks:
     run_tests:
