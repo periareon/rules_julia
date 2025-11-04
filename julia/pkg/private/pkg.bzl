@@ -127,7 +127,7 @@ def install(*, module_ctx, attrs, annotations = {}):
     packages = _read_lockfile_json(module_ctx, attrs.lockfile)
 
     # Get all package names for dependency filtering
-    all_package_names = set(packages.keys())
+    all_package_names = list(packages.keys())
 
     # Create repositories for all packages
     for package_name, package_data in packages.items():
