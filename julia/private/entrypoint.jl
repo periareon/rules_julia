@@ -2,6 +2,7 @@
 
 module RulesJuliaInit
 using Dates
+import TOML
 
 # Check if debug logging is enabled
 const DEBUG = haskey(ENV, "RULES_JULIA_DEBUG")
@@ -59,21 +60,24 @@ end
 function install_runfiles_from_manifest(
     manifest_file::String,
     output_dir::String,
-    include_paths::Vector{String} = String[],
+    runfiles_paths::Vector{String} = String[],
 )
     """Install files from a manifest file into a directory structure.
 
     Args:
         manifest_file: Path to the manifest file (format: rlocation_path real_path per line)
         output_dir: Directory where files should be installed
-        include_paths: Optional list of include path prefixes to filter by. If provided,
-                      only files whose rlocation paths start with one of these prefixes
-                      will be installed.
+        runfiles_paths: List of rlocation paths to install. If provided,
+                       only files whose rlocation paths are in this list will be installed.
     """
     use_symlinks = !Sys.iswindows()
 
-    # Create runfiles directory map from manifest, filtering by include paths
+    # Create a set of runfiles paths for fast lookup
+    runfiles_set = Set(runfiles_paths)
+
+    # Create runfiles directory map from manifest, filtering by runfiles_paths
     runfiles_map = Dict{String,String}()
+    repo_mapping_path = nothing
     total_entries = 0
     if isfile(manifest_file)
         open(manifest_file, "r") do f
@@ -88,29 +92,31 @@ function install_runfiles_from_manifest(
                     total_entries += 1
                     rlocation = parts[1]
                     real_path = parts[2]
-                    # Only add if it matches an include path prefix
-                    for include_path in include_paths
-                        # If the include path ends with `/src`, also collect everything above it
-                        # (e.g., Project.toml, Manifest.toml, etc.)
-                        parent_path = nothing
-                        if endswith(include_path, "/src")
-                            # Get the parent directory by removing "/src"
-                            parent_path = include_path[1:(end-4)]  # Remove "/src"
-                        end
 
-                        # Check if rlocation matches the include_path or its parent
-                        if startswith(rlocation, include_path) ||
-                           (parent_path !== nothing && startswith(rlocation, parent_path))
-                            runfiles_map[rlocation] = real_path
-                            break
-                        end
+                    # Always capture _repo_mapping if present
+                    if rlocation == "_repo_mapping"
+                        repo_mapping_path = real_path
+                    end
+
+                    # Only add if it's in the runfiles_paths set
+                    if rlocation in runfiles_set
+                        runfiles_map[rlocation] = real_path
                     end
                 end
             end
         end
     end
 
-    @debug "Filtered manifest: $(length(runfiles_map)) of $(total_entries) entries match include paths"
+    @debug "Filtered manifest: $(length(runfiles_map)) of $(total_entries) entries match runfiles paths"
+
+    # Always copy _repo_mapping if it was found in the manifest
+    # This is needed for rlocation() to work correctly with repository mappings
+    if repo_mapping_path !== nothing && isfile(repo_mapping_path)
+        repo_mapping_dst = joinpath(output_dir, "_repo_mapping")
+        mkpath(dirname(repo_mapping_dst))
+        cp(repo_mapping_path, repo_mapping_dst; force = true)
+        @debug "Copied _repo_mapping from manifest"
+    end
 
     # Install files from manifest
     for (rlocation, real_path) in runfiles_map
@@ -146,22 +152,21 @@ end
 
 # Function to compute include paths and set up LOAD_PATH
 function compute_includes(config_path)
-    # Load config file (simple line-based format)
-    # Each line is an include path
+    # Load config file in TOML format:
+    # includes: Array of include paths for LOAD_PATH
+    # runfiles: Array of all runfiles paths for manifest mode
     includes = String[]
+    runfiles_paths = String[]
+
     if isfile(config_path)
-        open(config_path, "r") do f
-            for line in eachline(f)
-                line = strip(line)
-                if !isempty(line)
-                    push!(includes, line)
-                end
-            end
-        end
+        config = TOML.parsefile(config_path)
+        includes = get(config, "includes", String[])
+        runfiles_paths = get(config, "runfiles", String[])
     end
 
     # Determine RUNFILES_DIR
     runfiles_dir = ""
+    should_use_manifest = false
 
     if haskey(ENV, "RUNFILES_DIR")
         runfiles_dir = ENV["RUNFILES_DIR"]
@@ -170,6 +175,7 @@ function compute_includes(config_path)
             @debug "RUNFILES_DIR set but directory does not exist: $(runfiles_dir)"
             # Fall through to manifest handling
             runfiles_dir = ""
+            should_use_manifest = true
         else
             # Check if the runfiles directory has more than just a `MANIFEST` file and `_repo_mapping`.
             # If it only has these, consider it "empty" and fall through to manifest handling.
@@ -189,12 +195,42 @@ function compute_includes(config_path)
                 end
                 # Fall through to manifest handling
                 runfiles_dir = ""
+                should_use_manifest = true
+            else
+                # Directory exists and has some files, but check if the actual include paths exist
+                # On Windows with manifest mode, the directory might exist but not have the actual source files
+                has_actual_files = false
+                for inc in includes
+                    inc_path = normpath(joinpath(runfiles_dir, inc))
+                    if isdir(inc_path)
+                        has_actual_files = true
+                        break
+                    end
+                end
+
+                if !has_actual_files
+                    @debug "RUNFILES_DIR exists but include paths are not present (manifest-only mode)"
+                    # If RUNFILES_MANIFEST_FILE is not set, set it to the MANIFEST file path
+                    if !haskey(ENV, "RUNFILES_MANIFEST_FILE") && "MANIFEST" in entries
+                        manifest_path = joinpath(runfiles_dir, "MANIFEST")
+                        if isfile(manifest_path)
+                            ENV["RUNFILES_MANIFEST_FILE"] = manifest_path
+                            @debug "Set RUNFILES_MANIFEST_FILE to: $(manifest_path)"
+                        end
+                    end
+                    # Fall through to manifest handling
+                    runfiles_dir = ""
+                    should_use_manifest = true
+                end
             end
         end
+    else
+        # RUNFILES_DIR not set, must use manifest
+        should_use_manifest = true
     end
 
     # If no valid RUNFILES_DIR, try to create from manifest
-    if isempty(runfiles_dir) && haskey(ENV, "RUNFILES_MANIFEST_FILE")
+    if isempty(runfiles_dir) && should_use_manifest && haskey(ENV, "RUNFILES_MANIFEST_FILE")
         manifest_file = ENV["RUNFILES_MANIFEST_FILE"]
         if isfile(manifest_file)
             # Create a temporary runfiles directory
@@ -204,8 +240,8 @@ function compute_includes(config_path)
 
             @debug "Creating runfiles directory from manifest: $(runfiles_dir)"
 
-            # Install files from manifest, filtering to only include paths for performance
-            install_runfiles_from_manifest(manifest_file, runfiles_dir, includes)
+            # Install files from manifest, filtering to runfiles_paths from config
+            install_runfiles_from_manifest(manifest_file, runfiles_dir, runfiles_paths)
 
             ENV["RUNFILES_DIR"] = runfiles_dir
         else
@@ -215,11 +251,19 @@ function compute_includes(config_path)
         end
     end
 
+    # Error if we couldn't determine a valid runfiles location
     if isempty(runfiles_dir)
-        println(
-            stderr,
-            "RUNFILES_DIR is not set and RUNFILES_MANIFEST_FILE is not provided or invalid.",
-        )
+        if should_use_manifest
+            println(
+                stderr,
+                "ERROR: RUNFILES_MANIFEST_FILE is not set or invalid, and RUNFILES_DIR is not usable.",
+            )
+        else
+            println(
+                stderr,
+                "ERROR: Neither RUNFILES_DIR nor RUNFILES_MANIFEST_FILE are set or valid.",
+            )
+        end
         exit(1)
     end
 
@@ -241,7 +285,7 @@ function compute_includes(config_path)
         end
     end
 
-    return runfiles_dir, include_paths
+    return runfiles_dir, include_paths, runfiles_paths
 end
 
 function initialize()
@@ -251,7 +295,7 @@ function initialize()
 
     # Compute includes
     @debug "Computing includes."
-    runfiles_dir, include_paths = compute_includes(config_path)
+    runfiles_dir, include_paths, runfiles_paths = compute_includes(config_path)
 
     @debug "Runfiles dir: $(runfiles_dir)"
 

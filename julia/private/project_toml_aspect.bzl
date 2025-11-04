@@ -1,6 +1,7 @@
 """Aspect for generating Project.toml files from Julia targets."""
 
-load(":julia.bzl", "JuliaInfo", "compute_main")
+load(":julia_common.bzl", "julia_common")
+load(":providers.bzl", "JuliaInfo")
 
 BASE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
@@ -117,7 +118,7 @@ def _julia_project_toml_aspect_impl(target, ctx):
 
     main_file = None
     if hasattr(ctx.rule.attr, "main"):
-        main_file = compute_main(target.label, ctx.rule.files.srcs, ctx.rule.file.main)
+        main_file = julia_common.compute_main(target.label, ctx.rule.files.srcs, ctx.rule.file.main)
         if main_file.owner.name != expected:
             fail("`{}` is not a proper Julia project. `main` must be located at `{}` but was `{}`".format(
                 target.label,

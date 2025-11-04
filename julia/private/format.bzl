@@ -1,6 +1,7 @@
 """Bazel rules for JuliaFormatter"""
 
-load(":julia.bzl", "JuliaInfo")
+load(":julia_common.bzl", "julia_common")
+load(":providers.bzl", "JuliaInfo")
 
 def _julia_format_aspect_impl(target, ctx):
     """Implementation of julia_format_aspect."""
@@ -66,30 +67,22 @@ julia_format_aspect = aspect(
     required_providers = [JuliaInfo],
 )
 
-def _rlocationpath(file, workspace_name):
-    """Convert a file to its runfiles location path."""
-    if file.short_path.startswith("../"):
-        return file.short_path[len("../"):]
-    return "{}/{}".format(workspace_name, file.short_path)
-
 def _julia_format_test_impl(ctx):
     """Implementation of julia_format_test rule."""
-    runner_info = ctx.attr._runner[DefaultInfo]
-
     target_info = ctx.attr.target[JuliaInfo]
 
-    # External repos always fall into the `../` branch of `_rlocationpath`.
+    # External repos always fall into the `../` branch of `julia_common.rlocationpath`.
     workspace_name = ctx.workspace_name
 
     # Get all non-generated sources
     srcs = [src for src in target_info.srcs.to_list() if src.is_source]
 
     def _srcs_map(file):
-        return "--src={}".format(_rlocationpath(file, workspace_name))
+        return "--src={}".format(julia_common.rlocationpath(file, workspace_name))
 
     args = ctx.actions.args()
     args.set_param_file_format("multiline")
-    args.add("--config", _rlocationpath(ctx.file.config, ctx.workspace_name))
+    args.add("--config", julia_common.rlocationpath(ctx.file.config, ctx.workspace_name))
     args.add_all(srcs, map_each = _srcs_map, allow_closure = True)
 
     args_file = ctx.actions.declare_file("{}.julia_format_args.txt".format(ctx.label.name))
@@ -98,30 +91,32 @@ def _julia_format_test_impl(ctx):
         content = args,
     )
 
-    is_windows = ctx.executable._runner.basename.endswith(".bat")
-    executable = ctx.actions.declare_file("{}{}".format(ctx.label.name, ".bat" if is_windows else ".sh"))
-    ctx.actions.symlink(
-        target_file = ctx.executable._runner,
-        output = executable,
-        is_executable = True,
+    # Curate values for the common implementation
+    # Use the runner's main source file as srcs
+    curated_srcs = [ctx.file._runner_main]
+
+    # Include the runner binary as a dependency
+    curated_deps = [ctx.attr._runner]
+
+    # Include args_file, config, and target srcs as data
+    curated_data_files = [args_file, ctx.file.config] + srcs
+    curated_data_targets = []
+
+    # Set environment variable for args file location
+    curated_env = {
+        "RULES_JULIA_FORMAT_ARGS_FILE": julia_common.rlocationpath(args_file, ctx.workspace_name),
+    }
+
+    # Call the common implementation with curated values
+    return julia_common.create_julia_binary_impl(
+        ctx = ctx,
+        srcs = curated_srcs,
+        deps = curated_deps,
+        data_files = curated_data_files,
+        data_targets = curated_data_targets,
+        env = curated_env,
+        main = ctx.file._runner_main,
     )
-
-    runfiles = ctx.runfiles(
-        files = [ctx.file.config, args_file] + srcs,
-    ).merge(runner_info.default_runfiles)
-
-    return [
-        DefaultInfo(
-            files = depset([executable]),
-            runfiles = runfiles,
-            executable = executable,
-        ),
-        RunEnvironmentInfo(
-            environment = {
-                "RULES_JULIA_FORMAT_ARGS_FILE": _rlocationpath(args_file, ctx.workspace_name),
-            },
-        ),
-    ]
 
 julia_format_test = rule(
     implementation = _julia_format_test_impl,
@@ -138,12 +133,29 @@ julia_format_test = rule(
             providers = [JuliaInfo],
             mandatory = True,
         ),
+        "_bash_runfiles": attr.label(
+            default = Label("@bazel_tools//tools/bash/runfiles"),
+        ),
+        "_entrypoint": attr.label(
+            default = Label("//julia/private:entrypoint.jl"),
+            allow_single_file = True,
+        ),
         "_runner": attr.label(
-            doc = "The process wrapper for running JuliaFormatter.",
-            cfg = "exec",
-            executable = True,
+            doc = "The format checker binary.",
+            cfg = "target",
+            providers = [JuliaInfo],
             default = Label("//julia/private/format:format_checker"),
+        ),
+        "_runner_main": attr.label(
+            doc = "The runner's main source file.",
+            allow_single_file = [".jl"],
+            default = Label("//julia/private/format:src/format_checker.jl"),
+        ),
+        "_wrapper_template": attr.label(
+            default = Label("//julia/private:binary_wrapper.tpl"),
+            allow_single_file = True,
         ),
     },
     test = True,
+    toolchains = [julia_common.TOOLCHAIN_TYPE],
 )

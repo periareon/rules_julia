@@ -1,39 +1,39 @@
 """Rules for testing Julia Manifest synchronization"""
 
-def _rlocationpath(file, workspace_name):
-    """Convert a file to its runfiles location path."""
-    if file.short_path.startswith("../"):
-        return file.short_path[len("../"):]
-    return "{}/{}".format(workspace_name, file.short_path)
+load("//julia/private:julia_common.bzl", "julia_common")
+load("//julia/private:providers.bzl", "JuliaInfo")
 
 def _julia_pkg_test_impl(ctx):
     manifest_toml = ctx.file.julia_manifest
     manifest_bazel_json = ctx.file.bazel_manifest
 
-    test_runner = ctx.executable._test_runner
-    executable = ctx.actions.declare_file("{}.{}".format(ctx.label.name, test_runner.extension).rstrip("."))
-    ctx.actions.symlink(
-        output = executable,
-        target_file = test_runner,
-        is_executable = True,
-    )
+    # Curate values for the common implementation
+    # Use the test runner's main source file as srcs
+    curated_srcs = [ctx.file._test_runner_main]
 
-    runfiles = ctx.runfiles(files = [manifest_toml, manifest_bazel_json]).merge(
-        ctx.attr._test_runner[DefaultInfo].default_runfiles,
-    )
+    # Include the test runner binary as a dependency
+    curated_deps = [ctx.attr._test_runner]
 
-    return [
-        DefaultInfo(
-            executable = executable,
-            runfiles = runfiles,
-        ),
-        RunEnvironmentInfo(
-            environment = {
-                "RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON": _rlocationpath(manifest_bazel_json, ctx.workspace_name),
-                "RULES_JULIA_PKG_TEST_MANIFEST_TOML": _rlocationpath(manifest_toml, ctx.workspace_name),
-            },
-        ),
-    ]
+    # Include manifest files as data
+    curated_data_files = [manifest_toml, manifest_bazel_json]
+    curated_data_targets = []
+
+    # Set environment variables for manifest file locations
+    curated_env = {
+        "RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON": julia_common.rlocationpath(manifest_bazel_json, ctx.workspace_name),
+        "RULES_JULIA_PKG_TEST_MANIFEST_TOML": julia_common.rlocationpath(manifest_toml, ctx.workspace_name),
+    }
+
+    # Call the common implementation with curated values
+    return julia_common.create_julia_binary_impl(
+        ctx = ctx,
+        srcs = curated_srcs,
+        deps = curated_deps,
+        data_files = curated_data_files,
+        data_targets = curated_data_targets,
+        env = curated_env,
+        main = ctx.file._test_runner_main,
+    )
 
 julia_pkg_test = rule(
     doc = """\
@@ -80,11 +80,29 @@ the test will fail with detailed error messages indicating what needs to be fixe
             allow_single_file = ["Manifest.toml", ".toml"],
             mandatory = True,
         ),
+        "_bash_runfiles": attr.label(
+            default = Label("@bazel_tools//tools/bash/runfiles"),
+        ),
+        "_entrypoint": attr.label(
+            default = Label("//julia/private:entrypoint.jl"),
+            allow_single_file = True,
+        ),
         "_test_runner": attr.label(
-            executable = True,
+            doc = "The pkg test runner binary.",
             cfg = "target",
+            providers = [JuliaInfo],
             default = Label("//julia/pkg/private:pkg_tester"),
+        ),
+        "_test_runner_main": attr.label(
+            doc = "The test runner's main source file.",
+            allow_single_file = [".jl"],
+            default = Label("//julia/pkg/private:pkg_tester.jl"),
+        ),
+        "_wrapper_template": attr.label(
+            default = Label("//julia/private:binary_wrapper.tpl"),
+            allow_single_file = True,
         ),
     },
     test = True,
+    toolchains = [julia_common.TOOLCHAIN_TYPE],
 )

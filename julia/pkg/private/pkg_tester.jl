@@ -146,14 +146,31 @@ function main()
     println("Julia Package Lockfile Verification Test")
     println("=" ^ 70)
 
-    # Parse arguments
-    args = parse_args()
-    manifest_toml = args["manifest_toml"]
-    manifest_bazel_json = args["manifest_bazel_json"]
+    manifest_toml_env = ENV["RULES_JULIA_PKG_TEST_MANIFEST_TOML"]
+    manifest_bazel_json_env = ENV["RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON"]
 
-    println("Manifest.toml: $manifest_toml")
-    println("Manifest.bazel.json: $manifest_bazel_json")
-    println()
+    if manifest_toml_env === nothing
+        println("Error: RULES_JULIA_PKG_TEST_MANIFEST_TOML is not sent.")
+        exit(1)
+    end
+
+    if manifest_bazel_json_env === nothing
+        println("Error: RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON is not sent.")
+        exit(1)
+    end
+
+    manifest_toml = rlocation(ENV["RULES_JULIA_PKG_TEST_MANIFEST_TOML"])
+    manifest_bazel_json = rlocation(ENV["RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON"])
+
+    if manifest_toml === nothing
+        println("Error: Failed to locate Manifest.toml runfile: $manifest_toml_env")
+        exit(1)
+    end
+
+    if manifest_bazel_json === nothing
+        println("Error: Failed to locate Bazel manifest runfile: $manifest_bazel_json")
+        exit(1)
+    end
 
     # Check files exist
     if !isfile(manifest_toml)
