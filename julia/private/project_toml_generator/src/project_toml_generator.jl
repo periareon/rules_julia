@@ -191,6 +191,28 @@ function main()
 
     path_prefix = relpath(temp_dir, main_project_dir)
 
+    # Create a dummy General registry to prevent Pkg from trying to download it
+    # This is necessary even with JULIA_PKG_OFFLINE=true when the depot is empty
+    depot_path = first(Base.DEPOT_PATH)
+    registry_dir = joinpath(depot_path, "registries", "General")
+    if !isdir(registry_dir)
+        mkpath(registry_dir)
+        # Create a minimal Registry.toml that satisfies Pkg's requirements
+        registry_toml = joinpath(registry_dir, "Registry.toml")
+        open(registry_toml, "w") do f
+            write(
+                f,
+                """
+       name = "General"
+       uuid = "23338594-aafe-5451-b93e-139f81909106"
+       repo = "https://github.com/JuliaRegistries/General.git"
+
+       [packages]
+       """,
+            )
+        end
+    end
+
     # Change to the main project directory and use Pkg to add dependencies
     cd(main_project_dir) do
         # Store the original relative paths for later replacement in Manifest.toml
