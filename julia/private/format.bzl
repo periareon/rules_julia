@@ -93,10 +93,10 @@ def _julia_format_test_impl(ctx):
 
     # Curate values for the common implementation
     # Use the runner's main source file as srcs
-    curated_srcs = [ctx.file._runner_main]
+    curated_srcs = [ctx.file._test_runner_main]
 
     # Include the runner binary as a dependency
-    curated_deps = [ctx.attr._runner]
+    curated_deps = [ctx.attr._test_runner]
 
     # Include args_file, config, and target srcs as data
     curated_data_files = [args_file, ctx.file.config] + srcs
@@ -115,7 +115,7 @@ def _julia_format_test_impl(ctx):
         data_files = curated_data_files,
         data_targets = curated_data_targets,
         env = curated_env,
-        main = ctx.file._runner_main,
+        main = ctx.file._test_runner_main,
     )
 
 julia_format_test = rule(
@@ -140,13 +140,13 @@ julia_format_test = rule(
             default = Label("//julia/private:entrypoint.jl"),
             allow_single_file = True,
         ),
-        "_runner": attr.label(
+        "_test_runner": attr.label(
             doc = "The format checker binary.",
             cfg = "target",
             providers = [JuliaInfo],
             default = Label("//julia/private/format:format_checker"),
         ),
-        "_runner_main": attr.label(
+        "_test_runner_main": attr.label(
             doc = "The runner's main source file.",
             allow_single_file = [".jl"],
             default = Label("//julia/private/format:src/format_checker.jl"),
