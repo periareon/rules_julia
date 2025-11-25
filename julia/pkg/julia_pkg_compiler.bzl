@@ -1,5 +1,7 @@
 """Rules for generating Julia Manifest.toml from Project.toml"""
 
+load("//julia/pkg/private:julia_pkg_compile_info.bzl", "JuliaPkgCompileInfo")
+
 def _julia_pkg_compiler_impl(ctx):
     project_toml = ctx.file.project_toml
     manifest_toml = ctx.file.manifest_toml
@@ -31,6 +33,11 @@ def _julia_pkg_compiler_impl(ctx):
     runfiles = ctx.runfiles(files = [project_toml]).merge(ctx.attr._compiler[DefaultInfo].default_runfiles)
 
     return [
+        JuliaPkgCompileInfo(
+            manifest_bazel_json = manifest_bazel_json,
+            manifest_toml = manifest_toml,
+            project_toml = project_toml,
+        ),
         DefaultInfo(
             executable = executable,
             runfiles = runfiles,
@@ -80,7 +87,7 @@ with SHA256 hashes for all packages and their dependency graph.
     attrs = {
         "manifest_bazel_json": attr.label(
             doc = "The location of the Manifest.bazel.json lockfile to generate/update with SHA256 hashes. If not specified, defaults to Manifest.bazel.json next to the manifest_toml file.",
-            allow_single_file = ["Manifest.bazel.json", ".json"],
+            allow_single_file = [".json"],
             mandatory = False,
         ),
         "manifest_toml": attr.label(

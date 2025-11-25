@@ -216,7 +216,7 @@ function main()
     # Change to the main project directory and use Pkg to add dependencies
     cd(main_project_dir) do
         # Store the original relative paths for later replacement in Manifest.toml
-        normalized_to_original = Dict{String,String}()
+        path_to_bazel_path = Dict{String,String}()
 
         # Capture Pkg.activate logging
         original_stdout = stdout
@@ -238,10 +238,10 @@ function main()
                 # and map it back to our original path
                 # Convert the relative path to an absolute path, then get the relative path from main_project_dir
                 abs_dep_path = abspath(joinpath(main_project_dir, relative_path))
-                # Normalize this path for Unix: replace `\` with `/`
-                normalized_path =
-                    replace(relpath(abs_dep_path, main_project_dir), '\\' => '/')
-                normalized_to_original[normalized_path] = relative_path
+
+                normalized_path = relpath(abs_dep_path, main_project_dir)
+                # Store the normalized path as-is; the replacement loop will handle normalization
+                path_to_bazel_path[normalized_path] = relative_path
 
                 Pkg.develop(Pkg.PackageSpec(name = dep_name, path = relative_path))
             end
@@ -259,7 +259,7 @@ function main()
                 content = read(stream, String)
 
                 if !isempty(content)
-                    println(stderr, stdout_content)
+                    println(stderr, content)
                 end
             end
         end
@@ -267,15 +267,39 @@ function main()
         # Read the manifest file as text for string replacement
         manifest_text = read("Manifest.toml", String)
 
+        # Read the project file as text for string replacement
+        project_text = read("Project.toml", String)
+
         # Replace normalized paths with original relative paths
-        for (normalized_path, original_path) in normalized_to_original
-            pattern = "path = \"$normalized_path\""
-            replacement = "path = \"$original_path\""
-            manifest_text = replace(manifest_text, pattern => replacement)
+        # The loop normalizes paths to handle both Unix and Windows path formats that Pkg might have written
+        for (original_path, bazel_path) in path_to_bazel_path
+            # Normalize original_path to handle both Unix and Windows formats
+            # Pkg writes paths with forward slashes to Project.toml even on Windows
+            unix_path = replace(original_path, "\\\\" => '/')
+            windows_path = replace(unix_path, '/' => "\\\\")
+
+            # For manifest, use bazel_path as-is
+            manifest_replacement = "path = \"$bazel_path\""
+            project_replacement = "path = \"$unix_path\""
+
+            # Replace in manifest
+            manifest_text =
+                replace(manifest_text, "path = \"$unix_path\"" => manifest_replacement)
+            manifest_text =
+                replace(manifest_text, "path = \"$windows_path\"" => manifest_replacement)
+
+            # Replace in project (normalize to Unix format)
+            project_text =
+                replace(project_text, "path = \"$unix_path\"" => project_replacement)
+            project_text =
+                replace(project_text, "path = \"$windows_path\"" => project_replacement)
         end
 
         # Write the updated manifest back
         write("Manifest.toml", manifest_text)
+
+        # Write the updated manifest back
+        write("Project.toml", project_text)
     end
 
     cp(main_project_file, args["output"])

@@ -28,16 +28,16 @@ _pkg_annotation_tag = tag_class(
             mandatory = True,
         ),
         "patch_args": attr.string_list(
-            doc = "Arguments to pass to the patch tool. See http_archive.patch_args",
+            doc = "Arguments to pass to the patch tool. See `http_archive.patch_args`",
             mandatory = False,
         ),
         "patch_tool": attr.string(
-            doc = "The patch tool to use. See http_archive.patch_tool",
+            doc = "The patch tool to use. See `http_archive.patch_tool`",
             mandatory = False,
         ),
         "patches": attr.label_list(
-            doc = "List of patch files to apply to the package. See http_archive.patches",
-            allow_files = [".patch"],
+            doc = "List of patch files to apply to the package. See `http_archive.patches`",
+            allow_files = [".patch", ".diff"],
             mandatory = False,
         ),
     },

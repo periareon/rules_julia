@@ -206,7 +206,7 @@ function generate_bazel_lockfile(packages::Dict{String,Any}, output_path::String
 
             lockfile[name] = Dict(
                 "urls" => [url],
-                "sha256" => integrity_value,
+                "integrity" => integrity_value,
                 "deps" => sort(deps),  # Sort dependencies for deterministic output
                 "version" => version,
                 "uuid" => uuid,

@@ -15,9 +15,7 @@ TRIPLET_TO_CONSTRAINTS = {
     "x86_64-w64-mingw32": ["@platforms//os:windows", "@platforms//cpu:x86_64"],
 }
 
-# TODO: Going beyond this will break `julia_standalone_binary`
-# https://github.com/JuliaLang/PackageCompiler.jl/issues/1066
-JULIA_DEFAULT_VERSION = "1.11.7"
+JULIA_DEFAULT_VERSION = "1.12.2"
 
 JULIA_VERSIONS = _JULIA_VERSIONS
 

@@ -1,14 +1,18 @@
 load("//julia/pkg:julia_pkg_compiler.bzl", "julia_pkg_compiler")
 load("//julia/pkg:julia_pkg_test.bzl", "julia_pkg_test")
 
+exports_files([
+    "issue-1066.patch",
+])
+
 julia_pkg_compiler(
     name = "pkg_update",
+    manifest_bazel_json = "//julia/private/standalone_compiler:Manifest.bazel.json",
     manifest_toml = "//julia/private/standalone_compiler:Manifest.toml",
     project_toml = "//julia/private/standalone_compiler:Project.toml",
 )
 
 julia_pkg_test(
     name = "pkg_test",
-    bazel_manifest = "//julia/private/standalone_compiler:Manifest.bazel.json",
-    julia_manifest = "//julia/private/standalone_compiler:Manifest.toml",
+    compiler = ":pkg_update",
 )

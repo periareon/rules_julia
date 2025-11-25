@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.7"
+julia_version = "1.12.2"
 manifest_format = "2.0"
-project_hash = "83f02e76ef6df480d8664ae1679533e186d5dcc6"
+project_hash = "413be973f3b9148759ec1b9e72a0a6f38784f37d"
 
 [[deps.calc_utils]]
 path = "../../../../../../_main/julia/private/tests/project_toml_aspect/calc_utils"
@@ -12,6 +12,12 @@ version = "0.1.0"
 [[deps.math_utils]]
 path = "../../../../../../_main/julia/private/tests/project_toml_aspect/math_utils"
 uuid = "62234bf0-86b8-55df-9605-bfaf93560baf"
+version = "0.1.0"
+
+[[deps.multi_deps_test]]
+deps = ["calc_utils", "string_utils"]
+path = "."
+uuid = "9c3b5921-cb41-50e1-bd03-ad74531446f2"
 version = "0.1.0"
 
 [[deps.string_utils]]

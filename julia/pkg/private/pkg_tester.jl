@@ -124,15 +124,15 @@ function check_lockfile_basic(lockfile_path::String, toml_packages::Dict)
             end
 
             pkg_section = content[start_idx:pkg_section_end]
-            if !contains(pkg_section, "\"sha256\":")
+            if !contains(pkg_section, "\"integrity\":")
                 push!(
                     errors,
-                    "Package '$name': missing 'sha256' field in Manifest.bazel.json",
+                    "Package '$name': missing 'integrity' field in Manifest.bazel.json",
                 )
-            elseif contains(pkg_section, "\"sha256\": \"\"")
+            elseif contains(pkg_section, "\"integrity\": \"\"")
                 push!(
                     errors,
-                    "Package '$name': 'sha256' field is empty in Manifest.bazel.json",
+                    "Package '$name': 'integrity' field is empty in Manifest.bazel.json",
                 )
             end
         end
@@ -209,9 +209,10 @@ function main()
         for (i, error) in enumerate(errors)
             println("  $i. $error")
         end
+        label = ENV["RULES_JULIA_PKG_TEST_COMPILER_LABEL"]
         println()
         println("Please run the pkg_compiler to regenerate the lockfile:")
-        println("  bazel run //path/to:pkg_update")
+        println("  bazel run $(label)")
         println("=" ^ 70)
         exit(1)
     end

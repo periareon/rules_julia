@@ -14,7 +14,7 @@ bazel_dep(name = "rules_julia", version = "{version}")
 julia = use_extension("@rules_julia//julia:extensions.bzl", "julia")
 julia.toolchain(
     name = "julia_toolchains",
-    version = "1.11.7",
+    version = "1.12.2",
 )
 use_repo(julia, "julia_toolchains")
 
