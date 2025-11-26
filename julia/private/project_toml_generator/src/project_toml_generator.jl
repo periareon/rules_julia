@@ -290,8 +290,6 @@ function main()
 
             # Replace in project (normalize to Unix format)
             project_text =
-                replace(project_text, "path = \"$unix_path\"" => project_replacement)
-            project_text =
                 replace(project_text, "path = \"$windows_path\"" => project_replacement)
         end
 

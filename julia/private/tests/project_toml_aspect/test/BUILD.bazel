@@ -75,50 +75,50 @@ filegroup(
 # Diff tests to verify the generated Project.toml files match expected content
 diff_test(
     name = "multi_deps_test_project_toml_diff",
-    file1 = "multi_deps_test.Project.toml",
+    file1 = "golden_multi_deps_test.Project.toml",
     file2 = ":multi_deps_test_project_toml",
 )
 
 diff_test(
     name = "math_utils_project_toml_diff",
-    file1 = "math_utils.Project.toml",
+    file1 = "golden_math_utils.Project.toml",
     file2 = ":math_utils_project_toml",
 )
 
 diff_test(
     name = "string_utils_project_toml_diff",
-    file1 = "string_utils.Project.toml",
+    file1 = "golden_string_utils.Project.toml",
     file2 = ":string_utils_project_toml",
 )
 
 diff_test(
     name = "calc_utils_project_toml_diff",
-    file1 = "calc_utils.Project.toml",
+    file1 = "golden_calc_utils.Project.toml",
     file2 = ":calc_utils_project_toml",
 )
 
 # Diff tests to verify the generated Manifest.toml files match expected content
 diff_test(
     name = "multi_deps_test_manifest_toml_diff",
-    file1 = "multi_deps_test.Manifest.toml",
+    file1 = "golden_multi_deps_test.Manifest.toml",
     file2 = ":multi_deps_test_manifest_toml",
 )
 
 diff_test(
     name = "math_utils_manifest_toml_diff",
-    file1 = "math_utils.Manifest.toml",
+    file1 = "golden_math_utils.Manifest.toml",
     file2 = ":math_utils_manifest_toml",
 )
 
 diff_test(
     name = "string_utils_manifest_toml_diff",
-    file1 = "string_utils.Manifest.toml",
+    file1 = "golden_string_utils.Manifest.toml",
     file2 = ":string_utils_manifest_toml",
 )
 
 diff_test(
     name = "calc_utils_manifest_toml_diff",
-    file1 = "calc_utils.Manifest.toml",
+    file1 = "golden_calc_utils.Manifest.toml",
     file2 = ":calc_utils_manifest_toml",
 )
 
@@ -127,13 +127,13 @@ julia_test(
     name = "project_toml_path_validation_test",
     srcs = ["project_toml_path_validation_test.jl"],
     data = [
-        "calc_utils.Project.toml",
-        "math_utils.Project.toml",
-        "multi_deps_test.Project.toml",
-        "string_utils.Project.toml",
+        "golden_calc_utils.Project.toml",
+        "golden_math_utils.Project.toml",
+        "golden_multi_deps_test.Project.toml",
+        "golden_string_utils.Project.toml",
     ],
     env = {
-        "PROJECT_TOML": "$(rlocationpath multi_deps_test.Project.toml)",
+        "PROJECT_TOML": "$(rlocationpath golden_multi_deps_test.Project.toml)",
     },
     deps = ["//julia/runfiles"],
 )
