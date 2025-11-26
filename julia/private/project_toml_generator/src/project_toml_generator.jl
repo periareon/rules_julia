@@ -275,7 +275,7 @@ function main()
         for (original_path, bazel_path) in path_to_bazel_path
             # Normalize original_path to handle both Unix and Windows formats
             # Pkg writes paths with forward slashes to Project.toml even on Windows
-            unix_path = replace(original_path, "\\\\" => '/')
+            unix_path = replace(original_path, "\\" => '/')
             windows_path = replace(unix_path, '/' => "\\\\")
 
             # For manifest, use bazel_path as-is
@@ -294,10 +294,10 @@ function main()
         end
 
         # Write the updated manifest back
-        write("Manifest.toml", manifest_text)
+        write(main_manifest_file, manifest_text)
 
         # Write the updated manifest back
-        write("Project.toml", project_text)
+        write(main_project_file, project_text)
     end
 
     cp(main_project_file, args["output"])

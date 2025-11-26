@@ -16,6 +16,7 @@ env:
 jobs:
   ci:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
