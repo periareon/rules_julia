@@ -1,7 +1,7 @@
 {
   "Glob": {
     "deps": [],
-    "sha256": "57fc878074eca976348fdd706b8a9c033baf74ea5433f5d3e0a4de4b068b9475",
+    "integrity": "sha256-V/yHgHTsqXY0j91wa4qcAzuvdOpUM/XT4KTeSwaLlHU=",
     "urls": [
       "https://pkg.julialang.org/package/c27321d9-0574-5035-807b-f59d2c89b15c/97285bbd5230dd766e9ef6749b80fc617126d496"
     ],
@@ -21,7 +21,7 @@
       "UUIDs",
       "p7zip_jll"
     ],
-    "sha256": "013cf9a464917d86ba960ebdcb2ef6f79f646d36eeb84a1a8cf82db3d3d082c1",
+    "integrity": "sha256-ATz5pGSRfYa6lg69yy72959kbTbuuEoajPgts9PQgsE=",
     "urls": [
       "https://pkg.julialang.org/package/9b87118b-4619-50d2-8e1e-99f35a4d4d9d/93fc54363169d8dfebc290f9c41d47caef702603"
     ],
@@ -33,7 +33,7 @@
       "SHA",
       "Scratch"
     ],
-    "sha256": "ca71fa3ec9d5b221379b36671efaeffa5da1745c2296a125cd9c20c657b4688e",
+    "integrity": "sha256-ynH6PsnVsiE3mzZnHvrv+l2hdFwilqElzZwgxle0aI4=",
     "urls": [
       "https://pkg.julialang.org/package/05181044-ff0b-4ac5-8273-598c1e38db00/ffdaf70d81cf6ff22c2b6e733c900c3321cab864"
     ],
@@ -44,7 +44,7 @@
     "deps": [
       "Dates"
     ],
-    "sha256": "b68763b6b7640748227ecc89aa369164713d265f93069a7fc5a48f83825215bf",
+    "integrity": "sha256-todjtrdkB0gifsyJqjaRZHE9Jl+TBpp/xaSPg4JSFb8=",
     "urls": [
       "https://pkg.julialang.org/package/6c6a2e73-6563-6170-7368-637461726353/9b81b8393e50b7d4e6d0a9f14e192294d3b7c109"
     ],

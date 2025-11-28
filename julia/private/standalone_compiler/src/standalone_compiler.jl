@@ -264,9 +264,13 @@ function install_project_tomls(
     # Create a new Project.toml with no dependencies
     new_project_data = Dict{String,Any}()
     for (key, value) in original_project_data
-        if key != "deps"
-            new_project_data[key] = value
+        if key == "deps"
+            continue
         end
+        if key == "sources"
+            continue
+        end
+        new_project_data[key] = value
     end
 
     # Write the new Project.toml

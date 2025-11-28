@@ -1,11 +1,19 @@
 """Rules for testing Julia Manifest synchronization"""
 
+load("//julia/pkg/private:julia_pkg_compile_info.bzl", "JuliaPkgCompileInfo")
 load("//julia/private:julia_common.bzl", "julia_common")
 load("//julia/private:providers.bzl", "JuliaInfo")
 
 def _julia_pkg_test_impl(ctx):
-    manifest_toml = ctx.file.julia_manifest
-    manifest_bazel_json = ctx.file.bazel_manifest
+    compiler_info = ctx.attr.compiler[JuliaPkgCompileInfo]
+
+    manifest_toml = compiler_info.manifest_toml
+    manifest_bazel_json = compiler_info.manifest_bazel_json
+
+    if not compiler_info.manifest_bazel_json:
+        fail("`{}` is not tracking `manifest_bazel_json`. Please update this target to track the Bazel output.".format(
+            ctx.attr.compiler.label,
+        ))
 
     # Curate values for the common implementation
     # Use the test runner's main source file as srcs
@@ -20,6 +28,7 @@ def _julia_pkg_test_impl(ctx):
 
     # Set environment variables for manifest file locations
     curated_env = {
+        "RULES_JULIA_PKG_TEST_COMPILER_LABEL": str(ctx.attr.compiler.label),
         "RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON": julia_common.rlocationpath(manifest_bazel_json, ctx.workspace_name),
         "RULES_JULIA_PKG_TEST_MANIFEST_TOML": julia_common.rlocationpath(manifest_toml, ctx.workspace_name),
     }
@@ -52,10 +61,17 @@ The test will fail if:
 Example:
 
 ```python
+julia_pkg_compiler(
+    name = "pkg_update",
+    project_toml = "Project.toml",
+    manifest_toml = "Manifest.toml",
+    # Normally optional but required for the `julia_pkg_test` target.
+    manifest_bazel_json = "Manifest.bazel.json",
+)
+
 julia_pkg_test(
     name = "pkg_sync_test",
-    manifest_toml = "Manifest.toml",
-    manifest_bazel_json = "Manifest.bazel.json",
+    compiler = ":pkg_update",
 )
 ```
 
@@ -70,14 +86,9 @@ the test will fail with detailed error messages indicating what needs to be fixe
 """,
     implementation = _julia_pkg_test_impl,
     attrs = {
-        "bazel_manifest": attr.label(
-            doc = "The Manifest.bazel.json lockfile to verify.",
-            allow_single_file = True,
-            mandatory = True,
-        ),
-        "julia_manifest": attr.label(
-            doc = "The Manifest.toml file to compare against.",
-            allow_single_file = ["Manifest.toml", ".toml"],
+        "compiler": attr.label(
+            doc = "The `julia_pkg_compiler` target ",
+            providers = [JuliaPkgCompileInfo],
             mandatory = True,
         ),
         "_bash_runfiles": attr.label(

@@ -6,3 +6,8 @@ version = "0.1.0"
 calc_utils = "f5eaaddd-945c-5daa-aea3-4fcc798637c8"
 math_utils = "62234bf0-86b8-55df-9605-bfaf93560baf"
 string_utils = "8eb61037-47d7-50b1-8014-8270b11ce57e"
+
+[sources]
+calc_utils = {path = "../calc_utils"}
+math_utils = {path = "../math_utils"}
+string_utils = {path = "../string_utils"}

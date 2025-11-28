@@ -27,6 +27,11 @@ sac_deps.install(
     name = "rules_julia_sac",
     lockfile = "//julia/private/standalone_compiler:Manifest.bazel.json",
 )
+sac_deps.pkg_annotation(
+    dep = "PackageCompiler",
+    patch_args = ["-p1"],
+    patches = ["@//julia/private/standalone_compiler/3rdparty/patches:issue-1066.patch"],
+)
 use_repo(
     sac_deps,
     "rules_julia_sac",

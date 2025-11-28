@@ -3,12 +3,12 @@ load("//julia/pkg:julia_pkg_test.bzl", "julia_pkg_test")
 
 julia_pkg_compiler(
     name = "pkg_update",
+    manifest_bazel_json = "//julia/private/format:Manifest.bazel.json",
     manifest_toml = "//julia/private/format:Manifest.toml",
     project_toml = "//julia/private/format:Project.toml",
 )
 
 julia_pkg_test(
     name = "pkg_test",
-    bazel_manifest = "//julia/private/format:Manifest.bazel.json",
-    julia_manifest = "//julia/private/format:Manifest.toml",
+    compiler = ":pkg_update",
 )
