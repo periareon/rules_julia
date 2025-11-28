@@ -12,3 +12,9 @@ build --verbose_failures
 # UI for cleaner CI output
 common --color=no
 common --show_timestamps
+
+# TODO: https://github.com/periareon/rules_julia/issues/7
+# `JuliaStandaloneCompile` is resource intensive and causes
+# github actions to run out of memory. For now we eliminate
+# parallelism
+build --jobs=1
