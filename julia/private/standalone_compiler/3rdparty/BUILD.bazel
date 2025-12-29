@@ -1,10 +1,6 @@
 load("//julia/pkg:julia_pkg_compiler.bzl", "julia_pkg_compiler")
 load("//julia/pkg:julia_pkg_test.bzl", "julia_pkg_test")
 
-exports_files([
-    "issue-1066.patch",
-])
-
 julia_pkg_compiler(
     name = "pkg_update",
     manifest_bazel_json = "//julia/private/standalone_compiler:Manifest.bazel.json",
