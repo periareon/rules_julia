@@ -1,21 +1,10 @@
 """Common utilities for Julia rules."""
 
 load(":providers.bzl", "JuliaInfo")
+load(":rlocation.bzl", "rlocationpath")
 load(":toolchain.bzl", "TOOLCHAIN_TYPE")
 
-def _rlocationpath(file, workspace_name):
-    """Convert a file to its runfiles location path.
-
-    Args:
-        file: A File object.
-        workspace_name: The workspace name.
-
-    Returns:
-        str: The runfiles location path for the file.
-    """
-    if file.short_path.startswith("../"):
-        return file.short_path[len("../"):]
-    return "{}/{}".format(workspace_name, file.short_path)
+_rlocationpath = rlocationpath
 
 def _compute_main(owner, srcs, main = None):
     """Determine the main entrypoint for executable rules.
@@ -39,7 +28,6 @@ def _compute_main(owner, srcs, main = None):
     if len(srcs) == 1:
         return srcs[0]
 
-    # Look for a file matching the target name
     main_candidate = None
     for src in srcs:
         basename = src.basename[:-len(".jl")] if src.basename.endswith(".jl") else src.basename
@@ -97,9 +85,15 @@ def _get_include(ctx, srcs = []):
     if not workspace_name:
         workspace_name = ctx.workspace_name
 
+    pkg_prefix = ctx.label.package + "/" if ctx.label.package else ""
     uses_srcs = True
     for src in srcs:
-        if not src.owner.name.startswith("src/"):
+        rel_path = src.short_path
+        if rel_path.startswith("../"):
+            rel_path = rel_path.split("/", 2)[-1] if "/" in rel_path[3:] else rel_path
+        elif rel_path.startswith(pkg_prefix):
+            rel_path = rel_path[len(pkg_prefix):]
+        if not rel_path.startswith("src/"):
             uses_srcs = False
             break
 
@@ -151,7 +145,6 @@ def _create_config_file(ctx, includes, runfiles):
     args.add("]")
     args.add("")
 
-    # Write config file
     ctx.actions.write(
         output = config,
         content = args,
@@ -171,8 +164,6 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info):
     Returns:
         File: The wrapper executable.
     """
-
-    # Template content for wrapper script
     template_file = ctx.file._wrapper_template
 
     is_windows = template_file.basename.endswith(".bat.tpl")
@@ -181,20 +172,17 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info):
     julia_bin = toolchain_info.julia
     entrypoint = ctx.file._entrypoint
 
-    # Get runfiles locations
     julia_rloc = _rlocationpath(julia_bin, ctx.workspace_name)
     entrypoint_rloc = _rlocationpath(entrypoint, ctx.workspace_name)
     config_rloc = _rlocationpath(config, ctx.workspace_name)
     main_rloc = _rlocationpath(main_file, ctx.workspace_name)
 
-    # Expand template
     ctx.actions.expand_template(
         template = template_file,
         output = wrapper,
         substitutions = {
             "{config}": config_rloc,
             "{entrypoint}": entrypoint_rloc,
-            "{experimental_entrypoint_use_include}": str(toolchain_info._experimental_entrypoint_use_include),
             "{interpreter}": julia_rloc,
             "{main}": main_rloc,
         },
@@ -227,12 +215,10 @@ def _create_julia_binary_impl(
     """
     toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
 
-    # Get the main source file
     if not srcs:
         fail("At least one source is required.")
     main_file = _compute_main(ctx.label, srcs, main)
 
-    # Collect transitive sources and includes
     transitive_srcs = depset(
         direct = srcs,
         transitive = [_collect_transitive_srcs(deps)],
@@ -245,29 +231,24 @@ def _create_julia_binary_impl(
         transitive = [_collect_includes(deps)],
     )
 
-    # Create runfiles first (needed for config file generation)
     runfiles = ctx.runfiles(files = srcs + data_files)
 
-    # Merge dependency runfiles
     for dep in deps:
-        # Get runfiles from JuliaInfo if available (julia_library provides this)
         if JuliaInfo in dep and hasattr(dep[JuliaInfo], "runfiles"):
             runfiles = runfiles.merge(dep[JuliaInfo].runfiles)
-            # Otherwise get from DefaultInfo (julia_binary provides this)
 
         elif DefaultInfo in dep and hasattr(dep[DefaultInfo], "default_runfiles"):
             runfiles = runfiles.merge(dep[DefaultInfo].default_runfiles)
 
-    # Add data runfiles
     for data_target in data_targets:
         if DefaultInfo in data_target:
             runfiles = runfiles.merge(data_target[DefaultInfo].default_runfiles)
 
-    # Create config file (needs runfiles to list all paths)
     config = _create_config_file(ctx, includes, runfiles)
 
-    # Create wrapper script
     wrapper = _create_julia_wrapper(ctx, main_file, config, toolchain_info)
+
+    extra_runfiles = [config, ctx.file._entrypoint]
 
     return [
         JuliaInfo(
@@ -282,10 +263,7 @@ def _create_julia_binary_impl(
             executable = wrapper,
             files = depset([wrapper]),
             runfiles = ctx.runfiles(
-                files = [
-                    config,
-                    ctx.file._entrypoint,
-                ],
+                files = extra_runfiles,
                 transitive_files = toolchain_info.all_files,
             ).merge_all([
                 runfiles,

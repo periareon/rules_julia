@@ -1,38 +1,30 @@
 """Julia toolchain rules"""
 
-load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load(":rlocation.bzl", "rlocationpath")
 
 TOOLCHAIN_TYPE = str(Label("//julia:toolchain_type"))
 
-def _rlocationpath(file, workspace_name):
-    """Convert a file to its runfiles location path."""
-    if file.short_path.startswith("../"):
-        return file.short_path[len("../"):]
-    return "{}/{}".format(workspace_name, file.short_path)
+_rlocationpath = rlocationpath
 
 def _julia_toolchain_impl(ctx):
     """Implementation of the julia_toolchain rule."""
 
-    # Create template variable for Julia binary
     make_variable_info = platform_common.TemplateVariableInfo({
         "JULIA": ctx.executable.julia.path,
         "JULIA_RLOCATIONPATH": _rlocationpath(ctx.executable.julia, ctx.workspace_name),
     })
 
-    # Collect all files needed for the toolchain
     all_files = depset(transitive = [
         ctx.attr.julia[DefaultInfo].default_runfiles.files if ctx.attr.julia[DefaultInfo].default_runfiles else depset(),
         ctx.attr.julia[DefaultInfo].files,
     ])
-
-    experimental_entrypoint_use_include = ctx.attr._experimental_entrypoint_use_include[BuildSettingInfo].value
 
     return [
         platform_common.ToolchainInfo(
             make_variable_info = make_variable_info,
             julia = ctx.executable.julia,
             all_files = all_files,
-            _experimental_entrypoint_use_include = experimental_entrypoint_use_include,
+            version = ctx.attr.version,
         ),
         make_variable_info,
     ]
@@ -47,8 +39,9 @@ julia_toolchain = rule(
             executable = True,
             mandatory = True,
         ),
-        "_experimental_entrypoint_use_include": attr.label(
-            default = Label("//julia/settings:experimental_entrypoint_use_include"),
+        "version": attr.string(
+            doc = "The Julia version string (e.g., '1.12.5').",
+            mandatory = True,
         ),
     },
 )

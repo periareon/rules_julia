@@ -39,6 +39,8 @@ python3 tools/update_versions/update_versions.py
 ```
 \"\"\"
 
+JULIA_DEFAULT_VERISON = "{}"
+
 JULIA_VERSIONS = {}
 """
 
@@ -97,7 +99,7 @@ def integrity(hex_str: str) -> str:
 def version_tuple(version_str: str) -> tuple[int, ...]:
     """Convert version string to tuple for comparison"""
     parts = []
-    for part in version_str.split('.'):
+    for part in version_str.split("."):
         try:
             parts.append(int(part))
         except ValueError:
@@ -119,7 +121,7 @@ def normalize_triplet(triplet: str) -> str | None:
     """
     # Remove version numbers from darwin and freebsd triplets
     # Match patterns like darwin14, darwin20, freebsd11.1, etc.
-    normalized = re.sub(r'(darwin|freebsd)\d+(\.\d+)?$', r'\1', triplet)
+    normalized = re.sub(r"(darwin|freebsd)\d+(\.\d+)?$", r"\1", triplet)
 
     # Check if it's in our supported list
     if normalized in SUPPORTED_TRIPLETS:
@@ -192,7 +194,12 @@ def main() -> None:
                 }
                 logging.debug("  %s: %s", normalized_triplet, url)
             except Exception as e:
-                logging.warning("Failed to get checksum for %s %s: %s", version_str, normalized_triplet, e)
+                logging.warning(
+                    "Failed to get checksum for %s %s: %s",
+                    version_str,
+                    normalized_triplet,
+                    e,
+                )
                 continue
 
     # Remove versions with no platforms
@@ -200,10 +207,13 @@ def main() -> None:
 
     # Sort versions
     sorted_output = dict(sorted(output.items(), key=lambda x: version_tuple(x[0])))
+    default_version = list(sorted_output.keys())[-1]
 
     logging.debug("Writing to %s", args.output)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(BUILD_TEMPLATE.format(json.dumps(sorted_output, indent=4)))
+    args.output.write_text(
+        BUILD_TEMPLATE.format(default_version, json.dumps(sorted_output, indent=4))
+    )
     logging.info("Done - wrote %d versions", len(sorted_output))
 
 

@@ -7,14 +7,12 @@ load(":toolchain.bzl", "TOOLCHAIN_TYPE")
 def _julia_library_impl(ctx):
     """Implementation of julia_library rule.
 
-    This is a pure metadata gathering rule - no actions are created.
-    It collects source files and propagates information to binaries/tests.
+    Collects source files and propagates information to binaries/tests.
     """
     srcs = depset(ctx.files.srcs)
     deps = ctx.attr.deps
     data = ctx.files.data
 
-    # Collect transitive sources
     transitive_srcs = depset(
         direct = ctx.files.srcs,
         transitive = [julia_common.collect_transitive_srcs(deps)],
@@ -27,7 +25,6 @@ def _julia_library_impl(ctx):
         transitive = [julia_common.collect_includes(deps)],
     )
 
-    # Create runfiles - no actions, just metadata
     runfiles = ctx.runfiles(files = ctx.files.srcs + data)
     for dep in deps:
         if JuliaInfo in dep:
@@ -74,8 +71,6 @@ julia_library = rule(
 
 def _julia_binary_impl(ctx):
     """Implementation of julia_binary rule."""
-
-    # Expand location references in env
     env = {}
     for key, value in ctx.attr.env.items():
         env[key] = ctx.expand_location(value, ctx.attr.data)
@@ -133,8 +128,6 @@ julia_binary = rule(
 
 def _julia_test_impl(ctx):
     """Implementation of julia_test rule."""
-
-    # Expand location references in env
     env = {}
     for key, value in ctx.attr.env.items():
         env[key] = ctx.expand_location(value, ctx.attr.data)

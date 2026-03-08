@@ -1,8 +1,8 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(
     ":settings.bzl",
-    "experimental_entrypoint_use_include",
-    "julia_formatter_config",
+    "formatter_config",
+    "version",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -16,6 +16,6 @@ bzl_library(
     ],
 )
 
-experimental_entrypoint_use_include()
+formatter_config()
 
-julia_formatter_config()
+version()

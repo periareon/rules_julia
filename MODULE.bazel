@@ -10,15 +10,11 @@ bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.4")
 
 # Register Julia toolchains for development
-julia = use_extension("//julia:extensions.bzl", "julia", dev_dependency = True)
-julia.toolchain(
-    name = "julia_toolchains",
-)
+julia = use_extension("//julia:extensions.bzl", "julia")
 use_repo(julia, "julia_toolchains")
 
 register_toolchains(
     "@julia_toolchains//:all",
-    dev_dependency = True,
 )
 
 # Julia package dependencies for standalone compiler

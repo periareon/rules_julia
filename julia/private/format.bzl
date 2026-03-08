@@ -2,6 +2,64 @@
 
 load(":julia_common.bzl", "julia_common")
 load(":providers.bzl", "JuliaInfo")
+load(":versions.bzl", "JULIA_DEFAULT_VERISON")
+
+def _version_gte(version, min_version):
+    """Check if version >= min_version using list comparison."""
+    v = [int(p) for p in version.split(".")]
+    m = [int(p) for p in min_version.split(".")]
+    return v >= m
+
+_VERSION_SETTING = str(Label("//julia/settings:version"))
+
+def _min_version_transition_impl(settings, _attr):
+    current = settings[_VERSION_SETTING]
+    target = current
+    if not _version_gte(current, "1.11.0"):
+        target = JULIA_DEFAULT_VERISON
+
+    return {_VERSION_SETTING: target}
+
+_min_version_transition = transition(
+    implementation = _min_version_transition_impl,
+    inputs = [_VERSION_SETTING],
+    outputs = [_VERSION_SETTING],
+)
+
+def _julia_formatter_binary_impl(ctx):
+    binary = ctx.attr.binary[0]
+
+    executable = ctx.executable.binary
+    symlink = ctx.actions.declare_file("{}.{}".format(ctx.label.name, executable.extension).strip("."))
+    ctx.actions.symlink(
+        target_file = executable,
+        output = symlink,
+        is_executable = True,
+    )
+
+    return [
+        DefaultInfo(
+            executable = symlink,
+            files = binary[DefaultInfo].files,
+            runfiles = binary[DefaultInfo].default_runfiles,
+        ),
+        binary[JuliaInfo],
+    ]
+
+julia_formatter_binary = rule(
+    doc = "A rule to ensure the formatter binaries use a supported Julia version.",
+    implementation = _julia_formatter_binary_impl,
+    attrs = {
+        "binary": attr.label(
+            doc = "The `julia_binary` to use",
+            cfg = _min_version_transition,
+            providers = [JuliaInfo],
+            executable = True,
+            mandatory = True,
+        ),
+    },
+    executable = True,
+)
 
 def _julia_format_aspect_impl(target, ctx):
     """Implementation of julia_format_aspect."""
@@ -18,6 +76,10 @@ def _julia_format_aspect_impl(target, ctx):
             return []
 
     if JuliaInfo not in target:
+        return []
+
+    toolchain_info = ctx.toolchains[julia_common.TOOLCHAIN_TYPE]
+    if hasattr(toolchain_info, "version") and not _version_gte(toolchain_info.version, "1.11.0"):
         return []
 
     julia_info = target[JuliaInfo]
@@ -55,16 +117,17 @@ julia_format_aspect = aspect(
             doc = "The config file (`.JuliaFormatter.toml`) containing JuliaFormatter settings.",
             cfg = "target",
             allow_single_file = True,
-            default = Label("//julia/settings:julia_formatter_config"),
+            default = Label("//julia/settings:formatter_config"),
         ),
         "_runner": attr.label(
             doc = "The process wrapper for running JuliaFormatter.",
             cfg = "exec",
             executable = True,
-            default = Label("//julia/private/format:format_checker"),
+            default = Label("//julia/private/format:format_checker_safe"),
         ),
     },
     required_providers = [JuliaInfo],
+    toolchains = [julia_common.TOOLCHAIN_TYPE],
 )
 
 def _julia_format_test_impl(ctx):
@@ -121,12 +184,13 @@ def _julia_format_test_impl(ctx):
 julia_format_test = rule(
     implementation = _julia_format_test_impl,
     doc = "A rule for running JuliaFormatter on a Julia target.",
+    cfg = _min_version_transition,
     attrs = {
         "config": attr.label(
             doc = "The config file (`.JuliaFormatter.toml`) containing JuliaFormatter settings.",
             cfg = "target",
             allow_single_file = True,
-            default = Label("//julia/settings:julia_formatter_config"),
+            default = Label("//julia/settings:formatter_config"),
         ),
         "target": attr.label(
             doc = "The target to run JuliaFormatter on.",

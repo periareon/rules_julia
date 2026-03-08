@@ -1,3 +1,4 @@
+load("//julia/private:format.bzl", "julia_formatter_binary")
 load("//julia/private:julia.bzl", "julia_binary")
 
 exports_files([
@@ -17,12 +18,18 @@ julia_binary(
     ],
 )
 
+julia_formatter_binary(
+    name = "format_checker_safe",
+    binary = ":format_checker",
+    visibility = ["//visibility:public"],
+)
+
 julia_binary(
     name = "format_fixer",
     srcs = ["src/format_fixer.jl"],
-    data = ["//julia/settings:julia_formatter_config"],
+    data = ["//julia/settings:formatter_config"],
     env = {
-        "JULIA_FORMATTER_CONFIG_PATH": "$(rlocationpath //julia/settings:julia_formatter_config)",
+        "JULIA_FORMATTER_CONFIG_PATH": "$(rlocationpath //julia/settings:formatter_config)",
     },
     visibility = ["//visibility:public"],
     deps = [

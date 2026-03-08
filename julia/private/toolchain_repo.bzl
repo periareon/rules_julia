@@ -1,7 +1,10 @@
 """Julia toolchain repository configuration"""
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("//julia/private:versions.bzl", _JULIA_VERSIONS = "JULIA_VERSIONS")
+load(
+    "//julia/private:versions.bzl",
+    _JULIA_VERSIONS = "JULIA_VERSIONS",
+)
 
 TRIPLET_TO_CONSTRAINTS = {
     "aarch64-apple-darwin": ["@platforms//os:macos", "@platforms//cpu:aarch64"],
@@ -14,8 +17,6 @@ TRIPLET_TO_CONSTRAINTS = {
     "x86_64-unknown-freebsd": ["@platforms//os:freebsd", "@platforms//cpu:x86_64"],
     "x86_64-w64-mingw32": ["@platforms//os:windows", "@platforms//cpu:x86_64"],
 }
-
-JULIA_DEFAULT_VERSION = "1.12.2"
 
 JULIA_VERSIONS = _JULIA_VERSIONS
 
@@ -35,6 +36,7 @@ filegroup(
 julia_toolchain(
     name = "toolchain",
     julia = ":julia_bin",
+    version = "{version}",
     visibility = ["//visibility:public"],
 )
 
@@ -76,6 +78,7 @@ def julia_toolchain_repository(*, name, version, triplet, url, integrity):
         build_file_content = _JULIA_TOOLCHAIN_BUILD_FILE_CONTENT.format(
             name = name,
             julia_bin = julia_bin,
+            version = version,
         ),
     )
 
@@ -86,6 +89,7 @@ toolchain(
     name = "{name}",
     exec_compatible_with = {exec_constraint_sets_serialized},
     target_compatible_with = {target_constraint_sets_serialized},
+    target_settings = {target_settings_serialized},
     toolchain = "{toolchain}",
     toolchain_type = "@rules_julia//julia:toolchain_type",
     visibility = ["//visibility:public"],
@@ -96,11 +100,13 @@ def _BUILD_for_toolchain_hub(
         toolchain_names,
         toolchain_labels,
         target_compatible_with,
-        exec_compatible_with):
+        exec_compatible_with,
+        target_settings):
     return "\n".join([_BUILD_FILE_FOR_TOOLCHAIN_HUB_TEMPLATE.format(
         name = toolchain_name,
-        exec_constraint_sets_serialized = json.encode(exec_compatible_with[toolchain_name]),
+        exec_constraint_sets_serialized = json.encode(exec_compatible_with.get(toolchain_name, [])),
         target_constraint_sets_serialized = json.encode(target_compatible_with.get(toolchain_name, [])),
+        target_settings_serialized = repr(target_settings.get(toolchain_name, None)),
         toolchain = toolchain_labels[toolchain_name],
     ) for toolchain_name in toolchain_names])
 
@@ -114,6 +120,7 @@ def _julia_toolchain_repository_hub_impl(repository_ctx):
         toolchain_labels = repository_ctx.attr.toolchain_labels,
         target_compatible_with = repository_ctx.attr.target_compatible_with,
         exec_compatible_with = repository_ctx.attr.exec_compatible_with,
+        target_settings = repository_ctx.attr.target_settings,
     ))
 
 julia_toolchain_repository_hub = repository_rule(
@@ -128,6 +135,10 @@ julia_toolchain_repository_hub = repository_rule(
         ),
         "target_compatible_with": attr.string_list_dict(
             doc = "A list of constraints for the target platform for this toolchain, keyed by toolchain name.",
+            mandatory = True,
+        ),
+        "target_settings": attr.string_list_dict(
+            doc = "A list of constraints settings for the target platform for this toolchain, keyed by toolchain name.",
             mandatory = True,
         ),
         "toolchain_labels": attr.string_dict(

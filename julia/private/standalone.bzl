@@ -10,13 +10,10 @@ load(
     "julia_project_toml_aspect",
 )
 load(":providers.bzl", "JuliaInfo")
+load(":rlocation.bzl", "rlocationpath")
 load(":toolchain.bzl", "TOOLCHAIN_TYPE")
 
-def _rlocationpath(file, workspace_name):
-    """Convert a file to its runfiles location path."""
-    if file.short_path.startswith("../"):
-        return file.short_path[len("../"):]
-    return "{}/{}".format(workspace_name, file.short_path)
+_rlocationpath = rlocationpath
 
 def _julia_standalone_binary_impl(ctx):
     # Get the binary target
