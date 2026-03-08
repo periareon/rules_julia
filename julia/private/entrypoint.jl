@@ -1,7 +1,6 @@
 # rules_julia entrypoint
 
 module RulesJuliaInit
-using Dates
 import TOML
 
 # Check if debug logging is enabled
@@ -10,13 +9,10 @@ const DEBUG = haskey(ENV, "RULES_JULIA_DEBUG")
 macro debug(msg)
     quote
         if DEBUG
-            println(
-                stderr,
-                "[",
-                Dates.format(Dates.now(), "HH:MM:SS.sss"),
-                "] ",
-                $(esc(msg)),
-            )
+            t = time()
+            ms = round(Int, (t - floor(t)) * 1000)
+            timestamp = Libc.strftime("%H:%M:%S", t) * "." * lpad(ms, 3, '0')
+            println(stderr, "[", timestamp, "] ", $(esc(msg)))
         end
     end
 end
@@ -33,17 +29,14 @@ function parse_args()
     config_path = ARGS[1]
     main_path = ARGS[2]
 
-    # Find `--` separator
-    function find_separator()
-        for (i, arg) in enumerate(ARGS)
-            if i > 2 && arg == "--"
-                return i
-            end
+    # Find `--` separator (must be after config and main paths)
+    separator_index = -1
+    for i in 3:length(ARGS)
+        if ARGS[i] == "--"
+            separator_index = i
+            break
         end
-        return -1
     end
-
-    separator_index = find_separator()
 
     if separator_index == -1
         println(stderr, "Missing -- separator after config and main script paths")
@@ -159,7 +152,12 @@ function compute_includes(config_path)
     runfiles_paths = String[]
 
     if isfile(config_path)
-        config = TOML.parsefile(config_path)
+        config = try
+            TOML.parsefile(config_path)
+        catch e
+            println(stderr, "ERROR: Failed to parse config file '$(config_path)': $(e)")
+            exit(1)
+        end
         includes = get(config, "includes", String[])
         runfiles_paths = get(config, "runfiles", String[])
     end
@@ -298,6 +296,7 @@ function initialize()
     runfiles_dir, include_paths, runfiles_paths = compute_includes(config_path)
 
     @debug "Runfiles dir: $(runfiles_dir)"
+    @debug "JULIA_DEPOT_PATH: $(get(ENV, "JULIA_DEPOT_PATH", "<not set>"))"
 
     # Set up ARGS for the main script
     empty!(ARGS)
@@ -326,107 +325,27 @@ function initialize()
     return main_full_path, include_paths
 end
 
-function build_subprocess_cmd(
-    main_full_path,
-    include_paths = String[],
-    depot_path = nothing,
-)
-    """Build a Cmd object for executing a Julia script in a subprocess.
-
-    Args:
-        main_full_path: Path to the main Julia script to execute
-        include_paths: Optional list of include paths to add to LOAD_PATH
-        depot_path: Optional path to Julia depot directory (sets JULIA_DEPOT_PATH)
-    """
-    # Start with Base.julia_cmd() to preserve default flags and get the correct Julia command
-    base_cmd = Base.julia_cmd()
-
-    # Build command parts starting from the base command's exec array
-    cmd_parts = collect(base_cmd.exec)
-
-    # Add the main script and its arguments
-    push!(cmd_parts, main_full_path)
-    append!(cmd_parts, ARGS)
-
-    # Create Cmd object from the command parts
-    cmd = Cmd(cmd_parts)
-
-    # Preserve environment variables and other properties from base command
-    # Merge base_cmd.env with current ENV to ensure all variables are passed through
-    env_dict = copy(ENV)
-    if base_cmd.env !== nothing
-        merge!(env_dict, base_cmd.env)
-    end
-
-    # Set JULIA_LOAD_PATH environment variable to preserve LOAD_PATH in subprocess
-    separator = Sys.iswindows() ? ';' : ':'
-    # Always preserve current global LOAD_PATH
-    current_load_paths = collect(LOAD_PATH)
-    all_paths = filter(p -> p != "", current_load_paths)
-
-    # If include_paths are provided, filter to existing directories and add them
-    if !isempty(include_paths)
-        valid_paths = filter(isdir, include_paths)
-        if !isempty(valid_paths)
-            append!(all_paths, valid_paths)
-        end
-    end
-
-    # Set JULIA_LOAD_PATH to preserve LOAD_PATH in subprocess
-    env_dict["JULIA_LOAD_PATH"] = join(all_paths, separator)
-
-    # Set JULIA_DEPOT_PATH if depot_path is provided
-    if depot_path !== nothing && !isempty(depot_path)
-        env_dict["JULIA_DEPOT_PATH"] = depot_path
-    end
-
-    # Set environment and ignorestatus
-    cmd = setenv(cmd, env_dict)
-    cmd = ignorestatus(cmd)
-
-    return cmd
-end
 end
 
 # Run initialization and get the main script path and include paths
-RULES_JULIA_PROGRAM_FILE, RULES_JULIA_INCLUDE_PATHS = RulesJuliaInit.initialize()
+RULES_JULIA_PROGRAM_FILE, _ = RulesJuliaInit.initialize()
 
-if haskey(ENV, "RULES_JULIA_EXPERIMENTAL_ENTRYPOINT_INCLUDE")
+# Set PROGRAM_FILE so scripts using the `if abspath(PROGRAM_FILE) == @__FILE__`
+# guard will execute their main function when include()'d.
+# Uses Core.eval to set it in Base directly, which works on Julia 1.10+
+# (unlike `global PROGRAM_FILE = ...` which fails on 1.10).
+RULES_JULIA_ORIGINAL_PROGRAM_FILE = PROGRAM_FILE
+Core.eval(Base, :(PROGRAM_FILE = $RULES_JULIA_PROGRAM_FILE))
 
-    # Set PROGRAM_FILE to the actual script being executed
-    RULES_JULIA_ORIGINAL_PROGRAM_FILE = PROGRAM_FILE
-    global PROGRAM_FILE = RULES_JULIA_PROGRAM_FILE
-
-    # Execute the main script
-    try
-        include(RULES_JULIA_PROGRAM_FILE)
-    catch e
-        println(stderr, "Error executing Julia script:")
-        showerror(stderr, e, catch_backtrace())
-        println(stderr)
-        exit(1)
-    finally
-        # Restore original PROGRAM_FILE
-        global PROGRAM_FILE = RULES_JULIA_ORIGINAL_PROGRAM_FILE
-    end
-
-else
-    # Create a temporary directory for the depot path
-    main_basename = splitext(basename(RULES_JULIA_PROGRAM_FILE))[1]
-    depot_path = mktempdir(prefix = "rjl_$(main_basename)_", cleanup = true)
-
-    # Build command to execute the script in a subprocess
-    cmd = RulesJuliaInit.build_subprocess_cmd(
-        RULES_JULIA_PROGRAM_FILE,
-        RULES_JULIA_INCLUDE_PATHS,
-        depot_path,
-    )
-
-    RulesJuliaInit.@debug "Executing subprocess: $(cmd)"
-
-    # Run the command with ignorestatus so we can check exit code
-    result = run(cmd, wait = true)
-    exit(result.exitcode)
+try
+    include(RULES_JULIA_PROGRAM_FILE)
+catch e
+    println(stderr, "Error executing Julia script:")
+    showerror(stderr, e, catch_backtrace())
+    println(stderr)
+    exit(1)
+finally
+    Core.eval(Base, :(PROGRAM_FILE = $RULES_JULIA_ORIGINAL_PROGRAM_FILE))
 end
 
 RulesJuliaInit.@debug "Done"

@@ -19,8 +19,6 @@ ENTRYPOINT="$(rlocation "{entrypoint}")"
 CONFIG="$(rlocation "{config}")"
 MAIN="$(rlocation "{main}")"
 
-RULES_JULIA_EXPERIMENTAL_ENTRYPOINT_INCLUDE="{experimental_entrypoint_use_include}"
-
 runfiles_export_envvars
 
 # Remove noisy variables
@@ -30,47 +28,45 @@ export -n -f "runfiles_current_repository"
 export -n -f "runfiles_export_envvars"
 export -n -f "runfiles_rlocation_checked"
 
-# Set up JULIA_DEPOT_PATH
+# Create a writable depot for any runtime compilation needs
 if [ -n "${RUNFILES_DIR:-}" ]; then
-    # Get parent directory of RUNFILES_DIR and create .depot next to it
     RUNFILES_PARENT="${RUNFILES_DIR%/*}"
-    DEPOT_DIR="${RUNFILES_PARENT}/.depot"
+    WRITABLE_DEPOT="${RUNFILES_PARENT}/.depot"
 elif [ -n "${RUNFILES_MANIFEST_FILE:-}" ]; then
-    # Pure bash implementation to get directory path
-    # Remove everything after the last '/' to get the directory, then go up one level
     MANIFEST_DIR="${RUNFILES_MANIFEST_FILE%/*}"
     MANIFEST_PARENT="${MANIFEST_DIR%/*}"
-    DEPOT_DIR="${MANIFEST_PARENT}/.depot"
+    WRITABLE_DEPOT="${MANIFEST_PARENT}/.depot"
 else
     echo>&2 "ERROR: Neither RUNFILES_DIR nor RUNFILES_MANIFEST_FILE is set"
     exit 1
 fi
 
-# Ensure depot directory path is absolute
-if [ "${DEPOT_DIR#/}" = "${DEPOT_DIR}" ]; then
-    # Path doesn't start with /, make it absolute
-    DEPOT_DIR="$(pwd)/${DEPOT_DIR}"
+# Ensure writable depot path is absolute
+if [ "${WRITABLE_DEPOT#/}" = "${WRITABLE_DEPOT}" ]; then
+    WRITABLE_DEPOT="$(pwd)/${WRITABLE_DEPOT}"
 fi
 
-export JULIA_DEPOT_PATH="${DEPOT_DIR}"
-export RULES_JULIA_DEPOT_PATH="${DEPOT_DIR}"
+# Trailing colon causes Julia to append its system depot (stdlib compiled caches).
+export JULIA_DEPOT_PATH="${WRITABLE_DEPOT}:"
+
+export RULES_JULIA_DEPOT_PATH="${WRITABLE_DEPOT}"
 export JULIA_PKG_PRECOMPILE_AUTO=0
 
 # Check if BAZEL_TEST is set in the environment and if so export JULIA_PKG_OFFLINE=true
-# This checks if BAZEL_TEST is set (even to empty string) using parameter expansion
 if [ -n "${BAZEL_TEST+set}" ]; then
     export JULIA_PKG_OFFLINE=true
 fi
 
-
-if [[ "${RULES_JULIA_EXPERIMENTAL_ENTRYPOINT_INCLUDE}" == "True" ]]; then
-    export RULES_JULIA_EXPERIMENTAL_ENTRYPOINT_INCLUDE
+# Default to no compiled modules. Opt in with RULES_JULIA_COMPILED_MODULES=1.
+COMPILED_MODULES="no"
+if [ "${RULES_JULIA_COMPILED_MODULES:-}" = "1" ]; then
+    COMPILED_MODULES="yes"
 fi
 
 # Execute Julia with the entrypoint
 exec \
     "${INTERPRETER}" \
-    --compiled-modules=no \
+    --compiled-modules="${COMPILED_MODULES}" \
     "${ENTRYPOINT}" \
     "${CONFIG}" \
     "${MAIN}" \

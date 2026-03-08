@@ -2,6 +2,7 @@
 
 load(":julia_common.bzl", "julia_common")
 load(":providers.bzl", "JuliaInfo")
+load(":rlocation.bzl", "rlocationpath")
 
 BASE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
@@ -30,11 +31,7 @@ def get_project_include(julia_info):
         return include[:-len("/src")]
     return include
 
-def _rlocationpath(file, workspace_name):
-    """Convert a file to its runfiles location path."""
-    if file.short_path.startswith("../"):
-        return file.short_path[len("../"):]
-    return "{}/{}".format(workspace_name, file.short_path)
+_rlocationpath = rlocationpath
 
 def _julia_project_toml_aspect_impl(target, ctx):
     """Aspect implementation for generating Project.toml files."""
