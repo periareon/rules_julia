@@ -203,7 +203,7 @@ julia_format_test(<a href="#julia_format_test-name">name</a>, <a href="#julia_fo
 <p><strong>ATTRIBUTES</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a id="julia_format_test-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="julia_format_test-config"></a>config</td><td style="text-align: left">The config file (<code>.JuliaFormatter.toml</code>) containing JuliaFormatter settings.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>"@rules_julia//julia/settings:julia_formatter_config"</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_format_test-config"></a>config</td><td style="text-align: left">The config file (<code>.JuliaFormatter.toml</code>) containing JuliaFormatter settings.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>"@rules_julia//julia/settings:formatter_config"</code></td></tr>
 <tr><td style="text-align: left"><a id="julia_format_test-target"></a>target</td><td style="text-align: left">The target to run JuliaFormatter on.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 </tbody></table>
 </div>
@@ -278,13 +278,14 @@ julia_test(<a href="#julia_test-name">name</a>, <a href="#julia_test-deps">deps<
 <pre>
 load("@rules_julia//julia:defs.bzl", "julia_toolchain")
 
-julia_toolchain(<a href="#julia_toolchain-name">name</a>, <a href="#julia_toolchain-julia">julia</a>)
+julia_toolchain(<a href="#julia_toolchain-name">name</a>, <a href="#julia_toolchain-julia">julia</a>, <a href="#julia_toolchain-version">version</a>)
 </pre>
 <p>A toolchain for building Julia targets.</p>
 <p><strong>ATTRIBUTES</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a id="julia_toolchain-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 <tr><td style="text-align: left"><a id="julia_toolchain-julia"></a>julia</td><td style="text-align: left">The path to the Julia binary (julia or julia.exe).</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_toolchain-version"></a>version</td><td style="text-align: left">The Julia version string (e.g., '1.12.5').</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 </tbody></table>
 </div>
 <p><a id="julia_format_aspect"></a></p>
@@ -301,19 +302,9 @@ julia_format_aspect()
 <h2 id="julia"><a class="header" href="#julia">julia</a></h2>
 <pre>
 julia = use_extension("@rules_julia//julia:defs.bzl", "julia")
-julia.toolchain(<a href="#julia.toolchain-name">name</a>, <a href="#julia.toolchain-version">version</a>)
 </pre>
 <p>Bzlmod extensions for Julia</p>
-<p><strong>TAG CLASSES</strong></p>
-<p><a id="julia.toolchain"></a></p>
-<h3 id="toolchain"><a class="header" href="#toolchain">toolchain</a></h3>
-<p>An extension for defining a <code>julia_toolchain</code> from a download archive.</p>
-<p><strong>Attributes</strong></p>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a id="julia.toolchain-name"></a>name</td><td style="text-align: left">The name of the toolchain hub.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="julia.toolchain-version"></a>version</td><td style="text-align: left">The version of Julia to download.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"1.12.2"</code></td></tr>
-</tbody></table>
-</div>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

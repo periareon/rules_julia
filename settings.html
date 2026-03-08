@@ -158,19 +158,28 @@
                         <!-- Generated with Stardoc: http://skydoc.bazel.build -->
 <h1 id="julia-settings"><a class="header" href="#julia-settings">Julia settings</a></h1>
 <p>Definitions for all <code>@rules_julia//julia</code> settings</p>
-<p><a id="experimental_entrypoint_use_include"></a></p>
-<h2 id="experimental_entrypoint_use_include"><a class="header" href="#experimental_entrypoint_use_include">experimental_entrypoint_use_include</a></h2>
+<p><a id="formatter_config"></a></p>
+<h2 id="formatter_config"><a class="header" href="#formatter_config">formatter_config</a></h2>
 <pre>
---@rules_julia//julia/settings:experimental_entrypoint_use_include
-</pre>
-<p>A flag to control whether or not <code>julia_binary</code> and <code>julia_test</code> should use     <a href="https://docs.julialang.org/en/v1/base/base/#include"><code>include</code></a> vs <a href="https://docs.julialang.org/en/v1/base/base/#Base.run"><code>run</code></a>     to launch <code>main</code>.</p>
-<p><a id="julia_formatter_config"></a></p>
-<h2 id="julia_formatter_config"><a class="header" href="#julia_formatter_config">julia_formatter_config</a></h2>
-<pre>
---@rules_julia//julia/settings:julia_formatter_config
+--@rules_julia//julia/settings:formatter_config
 </pre>
 <p>The <a href="https://domluna.github.io/JuliaFormatter.jl/stable/">JuliaFormatter</a> config file to use in formatting rules.</p>
-
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="formatter_config-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"formatter_config"</code></td></tr>
+</tbody></table>
+</div>
+<p><a id="version"></a></p>
+<h2 id="version"><a class="header" href="#version">version</a></h2>
+<pre>
+--@rules_julia//julia/settings:version
+</pre>
+<p>The version of julia to use</p>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="version-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"version"</code></td></tr>
+</tbody></table>
+</div>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
