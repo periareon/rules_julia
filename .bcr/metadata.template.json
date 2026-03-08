@@ -1,20 +1,22 @@
 {
     "homepage": "https://github.com/periareon/rules_julia",
     "maintainers": [
-      {
-        "name": "Spencer Putt",
-        "email": "sputt@alumni.iu.edu",
-        "github": "sputt"
-      },
-      {
-        "name": "Andre Brisco",
-        "email": "91817010+abrisco@users.noreply.github.com",
-        "github": "abrisco"
-      }
+        {
+            "email": "sputt@alumni.iu.edu",
+            "github": "sputt",
+            "github_user_id": 5309769,
+            "name": "Spencer Putt"
+        },
+        {
+            "email": "91817010+abrisco@users.noreply.github.com",
+            "github": "abrisco",
+            "github_user_id": 91817010,
+            "name": "Andre Brisco"
+        }
     ],
     "repository": [
-      "github:periareon/rules_julia"
+        "github:periareon/rules_julia"
     ],
     "versions": [],
     "yanked_versions": {}
-  }
+}
