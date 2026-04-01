@@ -197,9 +197,6 @@ julia_format_test = rule(
             providers = [JuliaInfo],
             mandatory = True,
         ),
-        "_bash_runfiles": attr.label(
-            default = Label("@bazel_tools//tools/bash/runfiles"),
-        ),
         "_entrypoint": attr.label(
             default = Label("//julia/private:entrypoint.jl"),
             allow_single_file = True,

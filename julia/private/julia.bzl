@@ -109,9 +109,6 @@ julia_binary = rule(
             allow_files = [".jl"],
             mandatory = True,
         ),
-        "_bash_runfiles": attr.label(
-            default = Label("@bazel_tools//tools/bash/runfiles"),
-        ),
         "_entrypoint": attr.label(
             default = Label("//julia/private:entrypoint.jl"),
             allow_single_file = True,
@@ -165,9 +162,6 @@ julia_test = rule(
             doc = "Julia test source files (.jl files).",
             allow_files = [".jl"],
             mandatory = True,
-        ),
-        "_bash_runfiles": attr.label(
-            default = Label("@bazel_tools//tools/bash/runfiles"),
         ),
         "_entrypoint": attr.label(
             default = Label("//julia/private:entrypoint.jl"),

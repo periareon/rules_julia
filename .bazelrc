@@ -44,7 +44,7 @@ build --incompatible_autoload_externally=
 ###############################################################################
 
 # Enable black for all targets in the workspace
-build:juliafmt --aspects=//julia:julia_format_aspect.bzl%julia_format_aspect
+build --aspects=//julia:julia_format_aspect.bzl%julia_format_aspect
 build:juliafmt --output_groups=+julia_format_checks
 
 # Define a config that enables all linter aspects.

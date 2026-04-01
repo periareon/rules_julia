@@ -1,8 +1,10 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":binary_wrapper.bzl", "julia_binary_wrapper")
 
 exports_files([
     "binary_wrapper.bat.tpl",
     "binary_wrapper.sh.tpl",
+    "binary_wrapper_maker.jl",
     "entrypoint.jl",
 ])
 
@@ -14,9 +16,9 @@ filegroup(
     srcs = ["entrypoint.jl"],
 )
 
-alias(
+julia_binary_wrapper(
     name = "binary_wrapper.tpl",
-    actual = select({
+    template = select({
         "@platforms//os:windows": "binary_wrapper.bat.tpl",
         "//conditions:default": "binary_wrapper.sh.tpl",
     }),

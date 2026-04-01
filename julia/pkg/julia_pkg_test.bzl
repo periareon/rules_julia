@@ -91,9 +91,6 @@ the test will fail with detailed error messages indicating what needs to be fixe
             providers = [JuliaPkgCompileInfo],
             mandatory = True,
         ),
-        "_bash_runfiles": attr.label(
-            default = Label("@bazel_tools//tools/bash/runfiles"),
-        ),
         "_entrypoint": attr.label(
             default = Label("//julia/private:entrypoint.jl"),
             allow_single_file = True,

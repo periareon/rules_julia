@@ -31,7 +31,7 @@ function parse_args()
 
     # Find `--` separator (must be after config and main paths)
     separator_index = -1
-    for i in 3:length(ARGS)
+    for i = 3:length(ARGS)
         if ARGS[i] == "--"
             separator_index = i
             break

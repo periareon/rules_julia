@@ -172,7 +172,7 @@ def _julia_standalone_binary_impl(ctx):
                 output_lib_dir,
                 output_share_dir,
                 output_wrapper,
-            ]).merge(ctx.attr._bash_runfiles[DefaultInfo].default_runfiles),
+            ]),
         ),
     ]
 
@@ -211,9 +211,6 @@ julia_standalone_binary = rule(
             cfg = "target",
             aspects = [julia_project_toml_aspect],
             providers = [JuliaInfo],
-        ),
-        "_bash_runfiles": attr.label(
-            default = Label("@bazel_tools//tools/bash/runfiles"),
         ),
         "_cc_toolchain": attr.label(
             default = Label("@rules_cc//cc:current_cc_toolchain"),
