@@ -166,7 +166,7 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info):
     """
     template_file = ctx.file._wrapper_template
 
-    is_windows = template_file.basename.endswith(".bat.tpl")
+    is_windows = template_file.basename.endswith(".bat")
     wrapper = ctx.actions.declare_file("{}{}".format(ctx.label.name, ".bat" if is_windows else ".sh"))
 
     julia_bin = toolchain_info.julia
@@ -267,7 +267,6 @@ def _create_julia_binary_impl(
                 transitive_files = toolchain_info.all_files,
             ).merge_all([
                 runfiles,
-                ctx.attr._bash_runfiles[DefaultInfo].default_runfiles,
             ]),
         ),
         RunEnvironmentInfo(

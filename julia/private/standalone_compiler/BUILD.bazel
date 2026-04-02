@@ -1,4 +1,5 @@
 load("//julia:julia_binary.bzl", "julia_binary")
+load("//julia/private:binary_wrapper.bzl", "julia_binary_wrapper")
 
 exports_files([
     "Project.toml",
@@ -8,9 +9,9 @@ exports_files([
     "standalone_wrapper.bat.tpl",
 ])
 
-alias(
+julia_binary_wrapper(
     name = "standalone_wrapper.tpl",
-    actual = select({
+    template = select({
         "@platforms//os:windows": "standalone_wrapper.bat.tpl",
         "//conditions:default": "standalone_wrapper.sh.tpl",
     }),
