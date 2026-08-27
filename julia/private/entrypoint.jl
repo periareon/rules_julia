@@ -4,12 +4,9 @@ module RulesJuliaInit
 import TOML
 import Pkg
 import UUIDs: UUID
-import Base: @debug
 
 # Check if debug logging is enabled
 const DEBUG = haskey(ENV, "RULES_JULIA_DEBUG")
-
-include("./entrypoint_utils.jl")
 
 macro debug(msg)
     quote
@@ -21,6 +18,8 @@ macro debug(msg)
         end
     end
 end
+
+include("./entrypoint_utils.jl")
 
 # Function to parse command line arguments
 function parse_args()

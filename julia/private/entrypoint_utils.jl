@@ -95,7 +95,7 @@ function setup_artifact_overrides(runfiles_dir::String, include_paths::Vector{St
     end
 
     if isempty(artifact_overrides)
-        @warn "No JLL artifacts found in runfiles"
+        @debug "No JLL artifacts found in runfiles"
         return nothing
     end
 
@@ -301,11 +301,11 @@ function setup_julia_environment(
         # dest_path avoids this.
         if occursin("__RUNFILES_DIR__", content)
             content = replace(content, "__RUNFILES_DIR__" => runfiles_dir)
-            @debug "Expanded __RUNFILES_DIR__ in LocalPreferences.toml" runfiles_dir
+            @debug "Expanded __RUNFILES_DIR__ in LocalPreferences.toml: $runfiles_dir"
         end
         dest_path = joinpath(env_dir, "LocalPreferences.toml")
         write(dest_path, content)
-        @debug "Wrote LocalPreferences.toml to env_dir" dest_path
+        @debug "Wrote LocalPreferences.toml to env_dir: $dest_path"
     end
 
     # Write modified Manifest.toml
