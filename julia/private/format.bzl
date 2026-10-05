@@ -2,21 +2,15 @@
 
 load(":julia_common.bzl", "julia_common")
 load(":providers.bzl", "JuliaInfo")
-load(":versions.bzl", "JULIA_DEFAULT_VERISON")
-
-def _version_gte(version, min_version):
-    """Check if version >= min_version using list comparison."""
-    v = [int(p) for p in version.split(".")]
-    m = [int(p) for p in min_version.split(".")]
-    return v >= m
+load(":versions.bzl", "JULIA_DEFAULT_VERSION")
 
 _VERSION_SETTING = str(Label("//julia/settings:version"))
 
 def _min_version_transition_impl(settings, _attr):
     current = settings[_VERSION_SETTING]
     target = current
-    if not _version_gte(current, "1.11.0"):
-        target = JULIA_DEFAULT_VERISON
+    if not julia_common.version_gte(current, "1.11.0"):
+        target = JULIA_DEFAULT_VERSION
 
     return {_VERSION_SETTING: target}
 
@@ -79,7 +73,7 @@ def _julia_format_aspect_impl(target, ctx):
         return []
 
     toolchain_info = ctx.toolchains[julia_common.TOOLCHAIN_TYPE]
-    if hasattr(toolchain_info, "version") and not _version_gte(toolchain_info.version, "1.11.0"):
+    if not julia_common.version_gte(toolchain_info.version, "1.11.0"):
         return []
 
     julia_info = target[JuliaInfo]
@@ -197,10 +191,6 @@ julia_format_test = rule(
             providers = [JuliaInfo],
             mandatory = True,
         ),
-        "_entrypoint": attr.label(
-            default = Label("//julia/private:entrypoint.jl"),
-            allow_single_file = True,
-        ),
         "_test_runner": attr.label(
             doc = "The format checker binary.",
             cfg = "target",
@@ -212,11 +202,7 @@ julia_format_test = rule(
             allow_single_file = [".jl"],
             default = Label("//julia/private/format:src/format_checker.jl"),
         ),
-        "_wrapper_template": attr.label(
-            default = Label("//julia/private:binary_wrapper.tpl"),
-            allow_single_file = True,
-        ),
-    },
+    } | julia_common.BINARY_ATTRS,
     test = True,
     toolchains = [julia_common.TOOLCHAIN_TYPE],
 )

@@ -1,5 +1,6 @@
 """Common utilities for Julia rules."""
 
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load(":providers.bzl", "JuliaInfo")
 load(":rlocation.bzl", "rlocationpath")
 load(":toolchain.bzl", "TOOLCHAIN_TYPE")
@@ -71,58 +72,90 @@ def _collect_includes(deps):
         transitive = [dep[JuliaInfo].includes for dep in deps if JuliaInfo in dep],
     )
 
-def _get_include(ctx, srcs = []):
-    """Get the include path for the current target.
+def _collect_depots(deps):
+    """Collect precompile depots from dependencies.
+
+    Args:
+        deps: List of dependency targets.
+
+    Returns:
+        depset: Depot directories.
+    """
+    return depset(
+        transitive = [dep[JuliaInfo].depots for dep in deps if JuliaInfo in dep],
+    )
+
+def _version_gte(version, min_version):
+    """Check if `version` >= `min_version` (dotted integer strings)."""
+    return [int(p) for p in version.split(".")] >= [int(p) for p in min_version.split(".")]
+
+def _package_layout(ctx, srcs):
+    """Determine a target's include path and package entry point.
+
+    Julia resolves `using Foo` against each `LOAD_PATH` directory by looking
+    for `Foo.jl`. The include path is therefore the directory holding the
+    target's entry point: `src/` for the canonical `src/<name>.jl` layout,
+    otherwise the package directory. Files under `ext/`, `test/` etc. never
+    influence the choice.
 
     Args:
         ctx: Rule context.
         srcs: List of source files.
 
     Returns:
-        str: Include path.
+        struct: `include` (str, relative to the runfiles root) and `entry`
+            (File or None), the `<include>/<name>.jl` source if present.
     """
     workspace_name = ctx.label.workspace_name
     if not workspace_name:
         workspace_name = ctx.workspace_name
 
     pkg_prefix = ctx.label.package + "/" if ctx.label.package else ""
-    uses_srcs = True
+    rel_paths = {}
     for src in srcs:
         rel_path = src.short_path
         if rel_path.startswith("../"):
-            rel_path = rel_path.split("/", 2)[-1] if "/" in rel_path[3:] else rel_path
-        elif rel_path.startswith(pkg_prefix):
+            # Strip the `../<repo>/` prefix of external files.
+            rel_path = rel_path[len("../"):].split("/", 1)[-1]
+        if rel_path.startswith(pkg_prefix):
             rel_path = rel_path[len(pkg_prefix):]
-        if not rel_path.startswith("src/"):
-            uses_srcs = False
-            break
+        rel_paths[rel_path] = src
 
     path = "{}/{}".format(workspace_name, ctx.label.package).rstrip("/")
-    if uses_srcs:
-        path = path + "/src"
 
-    return path
+    entry = ctx.label.name + ".jl"
+    if "src/" + entry in rel_paths:
+        return struct(include = path + "/src", entry = rel_paths["src/" + entry])
+    if entry in rel_paths:
+        return struct(include = path, entry = rel_paths[entry])
+    for rel_path in rel_paths:
+        if rel_path.startswith("src/"):
+            return struct(include = path + "/src", entry = None)
+    return struct(include = path, entry = None)
 
 def _includes_map(include):
     """Map function for formatting include paths."""
     return "    \"{}\",".format(include)
 
-def _create_config_file(ctx, includes, runfiles):
+def _create_config_file(ctx, includes, runfiles, depots, name = None):
     """Create a configuration file for Julia execution.
 
-    The config file contains two sections:
+    The config file contains three sections:
     1. [includes] - Include paths for LOAD_PATH
-    2. [runfiles] - All runfiles paths (excluding toolchain files) for manifest mode
+    2. [depots] - Depot directories holding build-time precompile caches
+    3. [runfiles] - All runfiles paths (excluding toolchain files) for manifest mode
 
     Args:
         ctx: Rule context.
         includes: depset of include paths.
         runfiles: ctx.runfiles object.
+        depots: depset of depot directories.
+        name: Optional basename for the config file (defaults to the target name).
 
     Returns:
         File: The config file.
     """
-    config = ctx.actions.declare_file("{}_config.toml".format(ctx.label.name))
+    config = ctx.actions.declare_file("{}_config.toml".format(name or ctx.label.name))
     args = ctx.actions.args()
     args.set_param_file_format("multiline")
 
@@ -133,6 +166,10 @@ def _create_config_file(ctx, includes, runfiles):
 
     args.add("includes = [")
     args.add_all(includes, map_each = _includes_map)
+    args.add("]")
+    args.add("")
+    args.add("depots = [")
+    args.add_all(depots, map_each = runfiles_map, allow_closure = True, expand_directories = False)
     args.add("]")
     args.add("")
     args.add("runfiles = [")
@@ -152,7 +189,7 @@ def _create_config_file(ctx, includes, runfiles):
 
     return config
 
-def _create_julia_wrapper(ctx, main_file, config, toolchain_info):
+def _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage = None):
     """Create a wrapper script to run Julia with proper environment.
 
     Args:
@@ -160,6 +197,7 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info):
         main_file: The main Julia file to execute.
         config: The config file.
         toolchain_info: The Julia toolchain info.
+        sysimage (File, optional): A custom system image to start Julia with.
 
     Returns:
         File: The wrapper executable.
@@ -176,6 +214,11 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info):
     entrypoint_rloc = _rlocationpath(entrypoint, ctx.workspace_name)
     config_rloc = _rlocationpath(config, ctx.workspace_name)
     main_rloc = _rlocationpath(main_file, ctx.workspace_name)
+    sysimage_rloc = _rlocationpath(sysimage, ctx.workspace_name) if sysimage else ""
+
+    # Tests only use caches that exist (`existing`, Julia 1.11+); older
+    # versions have no such mode and evaluate from source.
+    test_compiled_modules = "existing" if _version_gte(toolchain_info.version, "1.11.0") else "no"
 
     ctx.actions.expand_template(
         template = template_file,
@@ -185,6 +228,8 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info):
             "{entrypoint}": entrypoint_rloc,
             "{interpreter}": julia_rloc,
             "{main}": main_rloc,
+            "{sysimage}": sysimage_rloc,
+            "{test_compiled_modules}": test_compiled_modules,
         },
         is_executable = True,
     )
@@ -198,7 +243,8 @@ def _create_julia_binary_impl(
         data_files,
         data_targets,
         env,
-        main = None):
+        main = None,
+        sysimage = None):
     """Common implementation for julia_binary and julia_test rules.
 
     Args:
@@ -209,6 +255,7 @@ def _create_julia_binary_impl(
         data_targets: List of data targets (for runfiles merging).
         env: Dictionary of environment variables.
         main: Optional main File object.
+        sysimage: Optional custom system image File to start Julia with.
 
     Returns:
         list: List of providers [JuliaInfo, DefaultInfo, RunEnvironmentInfo].
@@ -224,10 +271,10 @@ def _create_julia_binary_impl(
         transitive = [_collect_transitive_srcs(deps)],
     )
 
-    include = _get_include(ctx, srcs)
+    layout = _package_layout(ctx, srcs)
 
     includes = depset(
-        [include],
+        [layout.include],
         transitive = [_collect_includes(deps)],
     )
 
@@ -244,20 +291,29 @@ def _create_julia_binary_impl(
         if DefaultInfo in data_target:
             runfiles = runfiles.merge(data_target[DefaultInfo].default_runfiles)
 
-    config = _create_config_file(ctx, includes, runfiles)
+    # Dependency depots are already in the dependencies' runfiles. With a
+    # custom system image every dependency is in the image and caches built
+    # against the stock image are rejected, so none are listed.
+    depots = _collect_depots(deps) if sysimage == None else depset()
 
-    wrapper = _create_julia_wrapper(ctx, main_file, config, toolchain_info)
+    config = _create_config_file(ctx, includes, runfiles, depots)
 
-    extra_runfiles = [config, ctx.file._entrypoint]
+    wrapper = _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage)
+
+    extra_runfiles = [config, ctx.file._entrypoint, ctx.file._rules_julia_common]
+    if sysimage:
+        extra_runfiles.append(sysimage)
 
     return [
         JuliaInfo(
             app_name = ctx.label.name,
             srcs = depset(srcs),
-            deps = depset(direct = deps),
             transitive_srcs = transitive_srcs,
-            include = include,
+            include = layout.include,
             includes = includes,
+            depots = depots,
+            entry = layout.entry,
+            runfiles = runfiles,
         ),
         DefaultInfo(
             executable = wrapper,
@@ -274,15 +330,157 @@ def _create_julia_binary_impl(
         ),
     ]
 
+def _write_runfiles_manifest(ctx, name, files):
+    """Write a manifest of `rlocationpath execpath` lines for build-time drivers.
+
+    Args:
+        ctx: Rule context.
+        name (str): Basename of the manifest file.
+        files (depset[File]): The files to list.
+
+    Returns:
+        File: The manifest.
+    """
+    workspace_name = ctx.workspace_name
+
+    def manifest_line(file):
+        return "{} {}".format(_rlocationpath(file, workspace_name), file.path)
+
+    args = ctx.actions.args()
+    args.set_param_file_format("multiline")
+    args.add_all(files, map_each = manifest_line, allow_closure = True, expand_directories = False)
+
+    manifest = ctx.actions.declare_file(name)
+    ctx.actions.write(output = manifest, content = args)
+    return manifest
+
+def _run_driver(
+        ctx,
+        *,
+        toolchain_info,
+        driver,
+        arguments,
+        inputs,
+        outputs,
+        mnemonic,
+        julia_flags = [],
+        env = {},
+        resource_set = None):
+    """Run one of the Julia build-time driver scripts.
+
+    Args:
+        ctx: Rule context.
+        toolchain_info (ToolchainInfo): The Julia toolchain.
+        driver (File): The driver script.
+        arguments (Args): Arguments for the driver.
+        inputs (depset[File]): Action inputs.
+        outputs (list[File]): Action outputs.
+        mnemonic (str): Action mnemonic.
+        julia_flags (list): Flags for `julia` itself.
+        env (dict): Additional environment variables.
+        resource_set (callable): Optional `resource_set` for the action.
+    """
+    julia_args = ctx.actions.args()
+    julia_args.add("--startup-file=no")
+    julia_args.add_all(julia_flags)
+    julia_args.add(driver)
+
+    kwargs = {}
+    if resource_set:
+        kwargs["resource_set"] = resource_set
+
+    ctx.actions.run(
+        mnemonic = mnemonic,
+        progress_message = "{} %{{label}}".format(mnemonic),
+        executable = toolchain_info.julia,
+        arguments = [julia_args, arguments],
+        inputs = inputs,
+        tools = depset([driver, ctx.file._rules_julia_common], transitive = [toolchain_info.all_files]),
+        outputs = outputs,
+        env = dicts.add(
+            {
+                "JULIA_NUM_PRECOMPILE_TASKS": "1",
+                "JULIA_NUM_THREADS": "1",
+                "JULIA_PKG_OFFLINE": "true",
+            },
+            env,
+        ),
+        **kwargs
+    )
+
+def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info):
+    """Precompile a Julia package into a depot directory.
+
+    Args:
+        ctx: Rule context.
+        name (str): The package (module) name.
+        includes (depset[str]): Include paths of the package and its dependencies.
+        runfiles (runfiles): Runfiles of the package and its dependencies.
+        dep_depots (depset[File]): Depots of dependencies.
+        toolchain_info (ToolchainInfo): The Julia toolchain.
+
+    Returns:
+        File: The depot directory containing the package's compile cache.
+    """
+    depot = ctx.actions.declare_directory("{}.depot".format(name))
+    config = _create_config_file(ctx, includes, runfiles, dep_depots, name = name + ".precompile")
+    manifest = _write_runfiles_manifest(ctx, "{}.precompile_manifest".format(name), runfiles.files)
+
+    args = ctx.actions.args()
+    args.add("--config", config)
+    args.add("--manifest", manifest)
+    args.add("--depot", depot.path)
+    args.add("--package", name)
+
+    _run_driver(
+        ctx,
+        toolchain_info = toolchain_info,
+        driver = ctx.file._precompiler,
+        arguments = args,
+        inputs = depset([config, manifest], transitive = [runfiles.files]),
+        outputs = [depot],
+        mnemonic = "JuliaPrecompile",
+        julia_flags = ["--compiled-modules=yes", "--pkgimages=yes"],
+    )
+
+    return depot
+
+# Attributes every rule using the build-time drivers needs.
+DRIVER_ATTRS = {
+    "_rules_julia_common": attr.label(
+        default = Label("//julia/private:rules_julia_common.jl"),
+        allow_single_file = True,
+    ),
+}
+
+# Attributes every rule producing a Julia executable needs.
+BINARY_ATTRS = dicts.add(DRIVER_ATTRS, {
+    "_entrypoint": attr.label(
+        default = Label("//julia/private:entrypoint.jl"),
+        allow_single_file = True,
+    ),
+    "_wrapper_template": attr.label(
+        default = Label("//julia/private:binary_wrapper.tpl"),
+        allow_single_file = True,
+    ),
+})
+
 # Public struct exposing all common utilities
 julia_common = struct(
     rlocationpath = _rlocationpath,
     compute_main = _compute_main,
     collect_transitive_srcs = _collect_transitive_srcs,
     collect_includes = _collect_includes,
-    get_include = _get_include,
+    collect_depots = _collect_depots,
+    package_layout = _package_layout,
+    precompile = _precompile,
+    run_driver = _run_driver,
+    write_runfiles_manifest = _write_runfiles_manifest,
+    version_gte = _version_gte,
     create_config_file = _create_config_file,
     create_julia_wrapper = _create_julia_wrapper,
     create_julia_binary_impl = _create_julia_binary_impl,
+    BINARY_ATTRS = BINARY_ATTRS,
+    DRIVER_ATTRS = DRIVER_ATTRS,
     TOOLCHAIN_TYPE = TOOLCHAIN_TYPE,
 )

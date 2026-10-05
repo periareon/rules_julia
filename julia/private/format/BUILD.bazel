@@ -10,7 +10,10 @@ exports_files([
 
 julia_binary(
     name = "format_checker",
-    srcs = ["src/format_checker.jl"],
+    srcs = [
+        "src/format_checker.jl",
+        "src/format_common.jl",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//julia/runfiles",
@@ -26,7 +29,10 @@ julia_formatter_binary(
 
 julia_binary(
     name = "format_fixer",
-    srcs = ["src/format_fixer.jl"],
+    srcs = [
+        "src/format_common.jl",
+        "src/format_fixer.jl",
+    ],
     data = ["//julia/settings:formatter_config"],
     env = {
         "JULIA_FORMATTER_CONFIG_PATH": "$(rlocationpath //julia/settings:formatter_config)",

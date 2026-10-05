@@ -7,6 +7,8 @@ import json
 import logging
 import os
 import re
+import shutil
+import subprocess
 import urllib.request
 from pathlib import Path
 
@@ -39,7 +41,7 @@ python3 tools/update_versions/update_versions.py
 ```
 \"\"\"
 
-JULIA_DEFAULT_VERISON = "{}"
+JULIA_DEFAULT_VERSION = "{}"
 
 JULIA_VERSIONS = {}
 """
@@ -67,8 +69,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-version",
         type=str,
-        default="1.6",
-        help="Minimum Julia version to include (default: 1.6)",
+        default="1.10",
+        help="Minimum Julia version to include (default: 1.10)",
     )
 
     return parser.parse_args()
@@ -205,9 +207,10 @@ def main() -> None:
     # Remove versions with no platforms
     output = {k: v for k, v in output.items() if v}
 
-    # Sort versions
-    sorted_output = dict(sorted(output.items(), key=lambda x: version_tuple(x[0])))
-    default_version = list(sorted_output.keys())[-1]
+    # Sort versions lexicographically (buildifier's `unsorted-dict-items`
+    # check requires it); the default is the highest version.
+    sorted_output = dict(sorted(output.items()))
+    default_version = max(sorted_output, key=version_tuple)
 
     logging.debug("Writing to %s", args.output)
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -215,6 +218,13 @@ def main() -> None:
         BUILD_TEMPLATE.format(default_version, json.dumps(sorted_output, indent=4))
     )
     logging.info("Done - wrote %d versions", len(sorted_output))
+
+    # The JSON rendering differs from buildifier's style (e.g. trailing commas).
+    buildifier = shutil.which("buildifier")
+    if buildifier:
+        subprocess.run([buildifier, str(args.output)], check=True)
+    else:
+        logging.warning("buildifier not found; run it on %s before committing", args.output)
 
 
 if __name__ == "__main__":

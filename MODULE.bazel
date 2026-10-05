@@ -19,16 +19,9 @@ register_toolchains(
     "@julia_toolchains//:all",
 )
 
-# Julia package dependencies for standalone compiler
-sac_deps = use_extension("//julia/pkg:extensions.bzl", "pkg")
-sac_deps.install(
-    name = "rules_julia_sac",
-    lockfile = "//julia/private/standalone_compiler:Manifest.bazel.json",
-)
-use_repo(
-    sac_deps,
-    "rules_julia_sac",
-)
+# Additional Julia versions exercised by CI.
+julia_dev = use_extension("//julia:extensions.bzl", "julia", dev_dependency = True)
+julia_dev.toolchain(version = "1.10.10")
 
 # Julia package dependencies for formatting
 fmt_deps = use_extension("//julia/pkg:extensions.bzl", "pkg")

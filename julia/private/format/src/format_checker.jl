@@ -1,12 +1,15 @@
 """
 JuliaFormatter wrapper for Bazel
 
-This script runs JuliaFormatter in check mode on specified Julia source files.
-It's designed to be used from Bazel rules for formatting checks.
+This script runs JuliaFormatter in check mode on specified Julia source files
+using an explicit config file. JuliaFormatter's upward search for
+`.JuliaFormatter.toml` files is disabled so that config files outside the
+workspace (e.g. in a parent directory of the repository) have no effect.
 """
 
-using JuliaFormatter: JuliaFormatter
 using Runfiles: rlocation
+
+include(joinpath(@__DIR__, "format_common.jl"))
 
 const DEBUG = haskey(ENV, "RULES_JULIA_DEBUG")
 
@@ -116,81 +119,31 @@ function main()
         debug("Marker: $marker_path")
     end
 
-    # Create a temporary directory for formatting
-    tempdir = mktempdir(; prefix = "julia_format_", cleanup = true)
-    debug("Created temp directory: $tempdir")
+    options = load_options(config_path)
 
-    # Copy config file to temp directory root
-    config_basename = basename(config_path)
-    temp_config = joinpath(tempdir, config_basename)
-    cp(config_path, temp_config)
-    debug("Copied config to: $temp_config")
-
-    # Copy all source files to temp directory, using paths specified on command line (key)
-    temp_sources = String[]
-    original_paths = String[]  # Keep track of original paths for error messages
-    for (original_path, resolved_path) in sources_dict
-        # Copy to temp directory using the original_path (key) as the destination path
-        dest_file = joinpath(tempdir, original_path)
-        dest_dir = dirname(dest_file)
-
-        # Ensure destination directory exists
-        if !ispath(dest_dir)
-            mkpath(dest_dir)
-            debug("Created destination directory: $dest_dir")
-        end
-
-        # Copy from the resolved path (actual file location) to the destination based on original path (key)
-        cp(resolved_path, dest_file)
-        push!(temp_sources, dest_file)
-        push!(original_paths, original_path)
-        debug("Copied source: $resolved_path -> $dest_file (original: $original_path)")
-    end
-
-    # Define variables that need to be accessed in finally block
-    exit_code = 0
     all_formatted = true
-
-    # Change to temp directory and perform formatting checks
-    debug("Changed to temp directory: $tempdir")
-    cd(tempdir) do
-        # Format files using JuliaFormatter in check mode
-        # format_file with overwrite=false returns true if the file is already formatted
-
-        for (i, temp_src) in enumerate(temp_sources)
-            # Get relative path from tempdir for format_file
-            rel_path = relpath(temp_src, tempdir)
-            debug("Checking format: $rel_path")
-
-            # Check if file needs formatting
-            # format_file returns true if file is already formatted (no changes needed)
-            is_formatted =
-                JuliaFormatter.format_file(rel_path; overwrite = false, verbose = false)
-            if !is_formatted
-                all_formatted = false
-                exit_code = 1
-                # Use original path for error message
-                original_src = original_paths[i]
-                println(stderr, "File is not formatted: $original_src")
-            end
+    for (original_path, resolved_path) in sort(collect(sources_dict))
+        debug("Checking format: $original_path")
+        is_formatted = JuliaFormatter.format_file(
+            resolved_path;
+            overwrite = false,
+            verbose = false,
+            options...,
+        )
+        if !is_formatted
+            all_formatted = false
+            println(stderr, "File is not formatted: $original_path")
         end
     end
-
 
     # Create marker file if specified (for aspect mode)
-    # This must be done after restoring the directory so paths are correct
     if marker_path !== nothing && all_formatted
-        # Ensure the directory exists before creating the marker file
-        marker_dir = dirname(marker_path)
-        if !ispath(marker_dir)
-            mkpath(marker_dir)
-            debug("Created marker directory: $marker_dir")
-        end
+        mkpath(dirname(marker_path))
         touch(marker_path)
         debug("Created marker file: $marker_path")
     end
 
-    exit(exit_code)
+    exit(all_formatted ? 0 : 1)
 end
 
 main()

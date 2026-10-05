@@ -33,28 +33,22 @@ export -n -f "runfiles_current_repository"
 export -n -f "runfiles_export_envvars"
 export -n -f "runfiles_rlocation_checked"
 
-# Create a writable depot for any runtime compilation needs
-if [ -n "${RUNFILES_DIR:-}" ]; then
-    RUNFILES_PARENT="${RUNFILES_DIR%/*}"
-    WRITABLE_DEPOT="${RUNFILES_PARENT}/.depot"
-elif [ -n "${RUNFILES_MANIFEST_FILE:-}" ]; then
-    MANIFEST_DIR="${RUNFILES_MANIFEST_FILE%/*}"
-    MANIFEST_PARENT="${MANIFEST_DIR%/*}"
-    WRITABLE_DEPOT="${MANIFEST_PARENT}/.depot"
+# Scratch depot for any run-time compilation. Never write into the output tree.
+if [ -n "${TEST_TMPDIR:-}" ]; then
+    WRITABLE_DEPOT="${TEST_TMPDIR}/rules_julia_depot"
 else
-    echo>&2 "ERROR: Neither RUNFILES_DIR nor RUNFILES_MANIFEST_FILE is set"
-    exit 1
+    WRITABLE_DEPOT="${TMPDIR:-/tmp}/rules_julia_depot"
 fi
 
-# Ensure writable depot path is absolute
-if [ "${WRITABLE_DEPOT#/}" = "${WRITABLE_DEPOT}" ]; then
-    WRITABLE_DEPOT="$(pwd)/${WRITABLE_DEPOT}"
-fi
-
-# Trailing colon causes Julia to append its system depot (stdlib compiled caches).
+# The trailing empty entry expands to Julia's bundled depots (stdlib caches)
+# and excludes the user depot (`~/.julia`).
 export JULIA_DEPOT_PATH="${WRITABLE_DEPOT}:"
 
-export RULES_JULIA_DEPOT_PATH="${WRITABLE_DEPOT}"
+# Only the active project and the stdlib are visible. Library include paths
+# are appended by the entrypoint. Nothing from the caller's shell leaks in.
+export JULIA_LOAD_PATH="@:@stdlib"
+unset JULIA_PROJECT
+
 export JULIA_PKG_PRECOMPILE_AUTO=0
 
 # Check if BAZEL_TEST is set in the environment and if so export JULIA_PKG_OFFLINE=true
@@ -62,15 +56,28 @@ if [ -n "${BAZEL_TEST+set}" ]; then
     export JULIA_PKG_OFFLINE=true
 fi
 
-# Default to no compiled modules. Opt in with RULES_JULIA_COMPILED_MODULES=1.
-COMPILED_MODULES="no"
-if [ "${RULES_JULIA_COMPILED_MODULES:-}" = "1" ]; then
+# Libraries are precompiled at build time and found via DEPOT_PATH. Tests
+# never write caches: anything without a build-time cache is evaluated from
+# source. `bazel run` keeps a persistent scratch depot and may compile into it.
+# Override with RULES_JULIA_COMPILED_MODULES=yes|no|existing|strict.
+if [ -n "${BAZEL_TEST+set}" ]; then
+    COMPILED_MODULES="{test_compiled_modules}"
+else
     COMPILED_MODULES="yes"
+fi
+COMPILED_MODULES="${RULES_JULIA_COMPILED_MODULES:-${COMPILED_MODULES}}"
+
+# Optional custom system image.
+SYSIMAGE="{sysimage}"
+SYSIMAGE_FLAGS=()
+if [ -n "${SYSIMAGE}" ]; then
+    SYSIMAGE_FLAGS=("--sysimage=$(rlocation "${SYSIMAGE}")")
 fi
 
 # Execute Julia with the entrypoint
 exec \
     "${INTERPRETER}" \
+    ${SYSIMAGE_FLAGS[@]+"${SYSIMAGE_FLAGS[@]}"} \
     --compiled-modules="${COMPILED_MODULES}" \
     "${ENTRYPOINT}" \
     "${CONFIG}" \

@@ -1,10 +1,8 @@
 # rules_julia entrypoint
 
 module RulesJuliaInit
-import TOML
 
-# Check if debug logging is enabled
-const DEBUG = haskey(ENV, "RULES_JULIA_DEBUG")
+include(joinpath(@__DIR__, "rules_julia_common.jl"))
 
 macro debug(msg)
     quote
@@ -49,98 +47,23 @@ function parse_args()
     return config_path, main_path, extra_args
 end
 
-# Function to install runfiles from manifest to a directory
+# Install the runfiles listed in the config (plus the repo mapping and the
+# contents of precompile depots) from a runfiles manifest into a directory.
 function install_runfiles_from_manifest(
     manifest_file::String,
     output_dir::String,
-    runfiles_paths::Vector{String} = String[],
+    runfiles_paths::Vector{String},
+    runfiles_dirs::Vector{String},
 )
-    """Install files from a manifest file into a directory structure.
-
-    Args:
-        manifest_file: Path to the manifest file (format: rlocation_path real_path per line)
-        output_dir: Directory where files should be installed
-        runfiles_paths: List of rlocation paths to install. If provided,
-                       only files whose rlocation paths are in this list will be installed.
-    """
-    use_symlinks = !Sys.iswindows()
-
-    # Create a set of runfiles paths for fast lookup
     runfiles_set = Set(runfiles_paths)
+    dir_prefixes = [dir * "/" for dir in runfiles_dirs]
+    keep(rlocation) =
+        rlocation == "_repo_mapping" ||
+        rlocation in runfiles_set ||
+        any(prefix -> startswith(rlocation, prefix), dir_prefixes)
 
-    # Create runfiles directory map from manifest, filtering by runfiles_paths
-    runfiles_map = Dict{String,String}()
-    repo_mapping_path = nothing
-    total_entries = 0
-    if isfile(manifest_file)
-        open(manifest_file, "r") do f
-            for line in eachline(f)
-                line = strip(line)
-                if isempty(line)
-                    continue
-                end
-                # Parse "rlocation_path real_path" format
-                parts = split(line, " ", limit = 2)
-                if length(parts) == 2
-                    total_entries += 1
-                    rlocation = parts[1]
-                    real_path = parts[2]
-
-                    # Always capture _repo_mapping if present
-                    if rlocation == "_repo_mapping"
-                        repo_mapping_path = real_path
-                    end
-
-                    # Only add if it's in the runfiles_paths set
-                    if rlocation in runfiles_set
-                        runfiles_map[rlocation] = real_path
-                    end
-                end
-            end
-        end
-    end
-
-    @debug "Filtered manifest: $(length(runfiles_map)) of $(total_entries) entries match runfiles paths"
-
-    # Always copy _repo_mapping if it was found in the manifest
-    # This is needed for rlocation() to work correctly with repository mappings
-    if repo_mapping_path !== nothing && isfile(repo_mapping_path)
-        repo_mapping_dst = joinpath(output_dir, "_repo_mapping")
-        mkpath(dirname(repo_mapping_dst))
-        cp(repo_mapping_path, repo_mapping_dst; force = true)
-        @debug "Copied _repo_mapping from manifest"
-    end
-
-    # Install files from manifest
-    for (rlocation, real_path) in runfiles_map
-        abs_src = normpath(real_path)
-        abs_dest = normpath(joinpath(output_dir, rlocation))
-
-        # Create parent directory
-        mkpath(dirname(abs_dest))
-
-        # Copy or symlink the file
-        if isfile(abs_src)
-            if use_symlinks
-                try
-                    symlink(abs_src, abs_dest)
-                catch e
-                    # If symlink fails (e.g., permissions), fall back to copy
-                    @debug "Symlink failed, copying instead: $(e)"
-                    cp(abs_src, abs_dest; force = true)
-                end
-            else
-                # On Windows, always copy files
-                cp(abs_src, abs_dest; force = true)
-            end
-        elseif isdir(abs_src)
-            # For directories, we could recursively copy, but typically manifests
-            # only contain files. Log a warning if we encounter a directory.
-            @debug "Skipping directory in manifest: $(abs_src)"
-        end
-    end
-
-    @debug "Installed $(length(runfiles_map)) files from manifest to $(output_dir)"
+    installed = install_tree(manifest_file, output_dir; keep = keep)
+    @debug "Installed $(length(installed)) files from manifest to $(output_dir)"
 end
 
 # Function to compute include paths and set up LOAD_PATH
@@ -148,19 +71,7 @@ function compute_includes(config_path)
     # Load config file in TOML format:
     # includes: Array of include paths for LOAD_PATH
     # runfiles: Array of all runfiles paths for manifest mode
-    includes = String[]
-    runfiles_paths = String[]
-
-    if isfile(config_path)
-        config = try
-            TOML.parsefile(config_path)
-        catch e
-            println(stderr, "ERROR: Failed to parse config file '$(config_path)': $(e)")
-            exit(1)
-        end
-        includes = get(config, "includes", String[])
-        runfiles_paths = get(config, "runfiles", String[])
-    end
+    includes, depots, runfiles_paths = read_config(config_path)
 
     # Determine RUNFILES_DIR
     runfiles_dir = ""
@@ -239,7 +150,12 @@ function compute_includes(config_path)
             @debug "Creating runfiles directory from manifest: $(runfiles_dir)"
 
             # Install files from manifest, filtering to runfiles_paths from config
-            install_runfiles_from_manifest(manifest_file, runfiles_dir, runfiles_paths)
+            install_runfiles_from_manifest(
+                manifest_file,
+                runfiles_dir,
+                runfiles_paths,
+                depots,
+            )
 
             ENV["RUNFILES_DIR"] = runfiles_dir
         else
@@ -274,14 +190,9 @@ function compute_includes(config_path)
     end
     ENV["RUNFILES_DIR"] = runfiles_dir
 
-    # Build include paths and add them to LOAD_PATH
-    # Normalize paths after joining to ensure consistent separators on Windows
-    include_paths = [normpath(joinpath(runfiles_dir, inc)) for inc in includes]
-    for inc_path in include_paths
-        if !(inc_path in LOAD_PATH)
-            push!(LOAD_PATH, inc_path)
-        end
-    end
+    # Expose build-time precompile caches and add the include paths to LOAD_PATH.
+    configure_depots!(runfiles_dir, depots)
+    include_paths = add_includes!(runfiles_dir, includes)
 
     return runfiles_dir, include_paths, runfiles_paths
 end
@@ -296,7 +207,7 @@ function initialize()
     runfiles_dir, include_paths, runfiles_paths = compute_includes(config_path)
 
     @debug "Runfiles dir: $(runfiles_dir)"
-    @debug "JULIA_DEPOT_PATH: $(get(ENV, "JULIA_DEPOT_PATH", "<not set>"))"
+    @debug "DEPOT_PATH: $(DEPOT_PATH)"
 
     # Set up ARGS for the main script
     empty!(ARGS)
@@ -337,15 +248,13 @@ RULES_JULIA_PROGRAM_FILE, _ = RulesJuliaInit.initialize()
 RULES_JULIA_ORIGINAL_PROGRAM_FILE = PROGRAM_FILE
 Core.eval(Base, :(PROGRAM_FILE = $RULES_JULIA_PROGRAM_FILE))
 
-try
-    include(RULES_JULIA_PROGRAM_FILE)
-catch e
-    println(stderr, "Error executing Julia script:")
-    showerror(stderr, e, catch_backtrace())
-    println(stderr)
-    exit(1)
-finally
-    Core.eval(Base, :(PROGRAM_FILE = $RULES_JULIA_ORIGINAL_PROGRAM_FILE))
-end
+# `include` is run through `invokelatest` so that the script's top-level
+# expressions each observe the bindings defined before them. Wrapping the
+# include in a single `try` expression pins the world age and, on Julia 1.12,
+# a script that defines and then calls `main()` warns (and will later error).
+# Uncaught errors propagate to Julia, which prints the error and exits 1.
+Base.invokelatest(include, RULES_JULIA_PROGRAM_FILE)
+
+Core.eval(Base, :(PROGRAM_FILE = $RULES_JULIA_ORIGINAL_PROGRAM_FILE))
 
 RulesJuliaInit.@debug "Done"

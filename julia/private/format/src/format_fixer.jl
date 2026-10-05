@@ -2,12 +2,14 @@
 JuliaFormatter wrapper for Bazel - Fixer
 
 This script runs JuliaFormatter in fix mode on specified Julia source files.
-It queries Bazel to find all Julia sources in the specified scope, then formats them.
-All sources are copied to a temp directory with the config, formatted, and copied back.
+It queries Bazel to find all Julia sources in the specified scope, then formats
+them in place using an explicit config file. JuliaFormatter's upward search for
+`.JuliaFormatter.toml` files is disabled.
 """
 
-using JuliaFormatter: JuliaFormatter
 using Runfiles: rlocation
+
+include(joinpath(@__DIR__, "format_common.jl"))
 
 const DEBUG = haskey(ENV, "RULES_JULIA_DEBUG")
 
@@ -178,79 +180,23 @@ function format_files(
     config_path::String,
     workspace_dir::String,
 )::Nothing
-    """Format files by copying to temp directory, formatting, and copying back."""
+    """Format files in place using the options from `config_path`."""
     if isempty(sources)
         debug("No sources to format")
         return nothing
     end
 
-    # Create a temporary directory for formatting
-    tempdir = mktempdir(; prefix = "julia_format_fix_", cleanup = true)
-    debug("Created temp directory: $tempdir")
+    options = load_options(config_path)
 
-    try
-        # Copy config file to temp directory root
-        config_basename = basename(config_path)
-        temp_config = joinpath(tempdir, config_basename)
-        cp(config_path, temp_config)
-        debug("Copied config to: $temp_config")
-
-        # Copy all source files to temp directory, preserving directory structure
-        temp_sources = String[]
-        for src in sources
-            # Source paths are workspace-relative (e.g., "julia/private/tests/format/library/src/test_lib.jl")
-            # Make absolute path by joining with workspace_dir
-            src_abs = joinpath(workspace_dir, src)
-            # Preserve this structure in the temp directory
-            dest_file = joinpath(tempdir, src)
-            dest_dir = dirname(dest_file)
-
-            mkpath(dest_dir)
-            cp(src_abs, dest_file)
-            push!(temp_sources, dest_file)
-            debug("Copied source: $src_abs -> $dest_file")
-        end
-
-        # Change to temp directory and perform formatting
-        old_pwd = pwd()
-        cd(tempdir)
-        debug("Changed to temp directory: $tempdir")
-
-        try
-            # Format files using JuliaFormatter in fix mode (overwrite=true)
-            formatted_files = String[]
-
-            for temp_src in temp_sources
-                # Get relative path from tempdir for format_file
-                rel_path = relpath(temp_src, tempdir)
-                debug("Formatting: $rel_path")
-
-                # Format the file (overwrite=true means it will modify the file)
-                JuliaFormatter.format_file(rel_path; overwrite = true, verbose = false)
-                push!(formatted_files, temp_src)
-                debug("Formatted: $rel_path")
-            end
-
-            # Copy formatted files back to workspace
-            for (i, temp_src) in enumerate(formatted_files)
-                original_src = joinpath(workspace_dir, sources[i])
-                cp(temp_src, original_src; force = true)
-                debug("Copied back: $temp_src -> $original_src")
-            end
-
-            debug("Successfully formatted $(length(formatted_files)) files")
-        finally
-            # Always restore original directory
-            cd(old_pwd)
-            debug("Restored directory: $old_pwd")
-        end
-    catch e
-        println(stderr, "Error during formatting: $e")
-        if DEBUG
-            showerror(stderr, e, catch_backtrace())
-        end
-        rethrow(e)
+    for src in sources
+        # Source paths are workspace-relative (e.g., "julia/private/tests/format/library/src/test_lib.jl")
+        src_abs = joinpath(workspace_dir, src)
+        debug("Formatting: $src")
+        JuliaFormatter.format_file(src_abs; overwrite = true, verbose = false, options...)
     end
+
+    debug("Successfully formatted $(length(sources)) files")
+    return nothing
 end
 
 function main()

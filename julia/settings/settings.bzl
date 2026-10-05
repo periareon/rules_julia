@@ -7,7 +7,7 @@ load(
     "@bazel_skylib//rules:common_settings.bzl",
     "string_flag",
 )
-load("//julia/private:versions.bzl", "JULIA_DEFAULT_VERISON", "JULIA_VERSIONS")
+load("//julia/private:versions.bzl", "JULIA_DEFAULT_VERSION", "JULIA_VERSIONS")
 
 def formatter_config(name = "formatter_config"):
     """The [JuliaFormatter](https://domluna.github.io/JuliaFormatter.jl/stable/) config file to use in formatting rules.
@@ -22,7 +22,7 @@ def version(name = "version"):
     string_flag(
         name = name,
         values = JULIA_VERSIONS.keys(),
-        build_setting_default = JULIA_DEFAULT_VERISON,
+        build_setting_default = JULIA_DEFAULT_VERSION,
     )
 
     for ver in JULIA_VERSIONS.keys():
