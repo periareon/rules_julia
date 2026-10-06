@@ -212,7 +212,7 @@ julia_format_test(<a href="#julia_format_test-name">name</a>, <a href="#julia_fo
 <pre>
 load("@rules_julia//julia:defs.bzl", "julia_library")
 
-julia_library(<a href="#julia_library-name">name</a>, <a href="#julia_library-deps">deps</a>, <a href="#julia_library-srcs">srcs</a>, <a href="#julia_library-data">data</a>)
+julia_library(<a href="#julia_library-name">name</a>, <a href="#julia_library-deps">deps</a>, <a href="#julia_library-srcs">srcs</a>, <a href="#julia_library-data">data</a>, <a href="#julia_library-precompile">precompile</a>)
 </pre>
 <p>A sharable Julia library or module.</p>
 <p><strong>ATTRIBUTES</strong></p>
@@ -221,6 +221,7 @@ julia_library(<a href="#julia_library-name">name</a>, <a href="#julia_library-de
 <tr><td style="text-align: left"><a id="julia_library-deps"></a>deps</td><td style="text-align: left">Other Julia libraries this target depends on</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
 <tr><td style="text-align: left"><a id="julia_library-srcs"></a>srcs</td><td style="text-align: left">Julia source files (.jl files)</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 <tr><td style="text-align: left"><a id="julia_library-data"></a>data</td><td style="text-align: left">Additional files needed at runtime</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_library-precompile"></a>precompile</td><td style="text-align: left">Precompile the library at build time. The resulting cache is placed on <code>DEPOT_PATH</code> for every binary and test that depends on this library. Requires the module entry point <code>&lt;name&gt;.jl</code> (typically <code>src/&lt;name&gt;.jl</code>) and Julia 1.11+; otherwise no cache is produced.</td><td style="text-align: left">Boolean</td><td style="text-align: left">optional</td><td style="text-align: left"><code>True</code></td></tr>
 </tbody></table>
 </div>
 <p><a id="julia_standalone_binary"></a></p>
@@ -228,19 +229,22 @@ julia_library(<a href="#julia_library-name">name</a>, <a href="#julia_library-de
 <pre>
 load("@rules_julia//julia:defs.bzl", "julia_standalone_binary")
 
-julia_standalone_binary(<a href="#julia_standalone_binary-name">name</a>, <a href="#julia_standalone_binary-binary">binary</a>)
+julia_standalone_binary(<a href="#julia_standalone_binary-name">name</a>, <a href="#julia_standalone_binary-binary">binary</a>, <a href="#julia_standalone_binary-cpu_target">cpu_target</a>, <a href="#julia_standalone_binary-precompile_statements">precompile_statements</a>)
 </pre>
-<p>A rule for converting a <code>julia_binary</code> to a standalone application.</p>
-<p>This rule uses PackageCompiler.jl to create a standalone executable that includes
-the Julia runtime and all dependencies. The resulting application can be
-distributed and run on machines without Julia installed.</p>
-<p>Dependencies are provided hermetically through Bazel - no network access required!
-PackageCompiler.jl and all Julia package dependencies are managed through the
-Bazel build system.</p>
+<p>Build a Julia package and its dependencies into a custom system image and
+produce an executable that starts Julia with it.</p>
+<p>The system image is produced in two actions: <code>julia --output-o</code> emits the
+object archive of the image, which the C++ toolchain links into a shared
+library. The executable is the regular Julia wrapper started with
+<code>--sysimage</code>, so all code is loaded precompiled and startup is immediate.
+No network access or host tools outside the Bazel toolchains are involved.</p>
+<p>The target in <code>binary</code> must be a Julia package: its entry point is
+<code>src/&lt;name&gt;.jl</code> defining <code>module &lt;name&gt;</code> with a <code>julia_main()::Cint</code> function,
+which is called with the command line arguments in <code>ARGS</code>.</p>
 <p>Example:</p>
 <pre><code class="language-python">julia_binary(
     name = "my_app_bin",
-    srcs = ["my_app.jl"],
+    srcs = ["src/my_app_bin.jl"],
     deps = ["//my/lib"],
 )
 
@@ -252,7 +256,9 @@ julia_standalone_binary(
 <p><strong>ATTRIBUTES</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a id="julia_standalone_binary-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="julia_standalone_binary-binary"></a>binary</td><td style="text-align: left">The julia_binary target to convert into a standalone application</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_standalone_binary-binary"></a>binary</td><td style="text-align: left">The <code>julia_binary</code> (or <code>julia_library</code>) package to build into the system image.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_standalone_binary-cpu_target"></a>cpu_target</td><td style="text-align: left">The <code>--cpu-target</code> to compile the system image for. Defaults to the toolchain's portable multi-versioned target for its architecture.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>""</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_standalone_binary-precompile_statements"></a>precompile_statements</td><td style="text-align: left">Files of precompile statements (as produced by <code>julia --trace-compile</code>) whose methods are compiled into the system image.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
 </tbody></table>
 </div>
 <p><a id="julia_test"></a></p>
@@ -278,13 +284,16 @@ julia_test(<a href="#julia_test-name">name</a>, <a href="#julia_test-deps">deps<
 <pre>
 load("@rules_julia//julia:defs.bzl", "julia_toolchain")
 
-julia_toolchain(<a href="#julia_toolchain-name">name</a>, <a href="#julia_toolchain-julia">julia</a>, <a href="#julia_toolchain-version">version</a>)
+julia_toolchain(<a href="#julia_toolchain-name">name</a>, <a href="#julia_toolchain-cpu_target">cpu_target</a>, <a href="#julia_toolchain-julia">julia</a>, <a href="#julia_toolchain-link_files">link_files</a>, <a href="#julia_toolchain-sysimage">sysimage</a>, <a href="#julia_toolchain-version">version</a>)
 </pre>
 <p>A toolchain for building Julia targets.</p>
 <p><strong>ATTRIBUTES</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a id="julia_toolchain-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_toolchain-cpu_target"></a>cpu_target</td><td style="text-align: left">The default <code>--cpu-target</code> for system images built with this toolchain. Should be portable across machines of the toolchain's architecture.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"generic"</code></td></tr>
 <tr><td style="text-align: left"><a id="julia_toolchain-julia"></a>julia</td><td style="text-align: left">The path to the Julia binary (julia or julia.exe).</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_toolchain-link_files"></a>link_files</td><td style="text-align: left">The <code>libjulia</code> libraries needed to link a system image.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_toolchain-sysimage"></a>sysimage</td><td style="text-align: left">The stock system image (<code>sys.so</code>, <code>sys.dylib</code> or <code>sys.dll</code>).</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
 <tr><td style="text-align: left"><a id="julia_toolchain-version"></a>version</td><td style="text-align: left">The Julia version string (e.g., '1.12.5').</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 </tbody></table>
 </div>
@@ -302,9 +311,18 @@ julia_format_aspect()
 <h2 id="julia"><a class="header" href="#julia">julia</a></h2>
 <pre>
 julia = use_extension("@rules_julia//julia:defs.bzl", "julia")
+julia.toolchain(<a href="#julia.toolchain-version">version</a>)
 </pre>
 <p>Bzlmod extensions for Julia</p>
-
+<p><strong>TAG CLASSES</strong></p>
+<p><a id="julia.toolchain"></a></p>
+<h3 id="toolchain"><a class="header" href="#toolchain">toolchain</a></h3>
+<p>Request that a Julia version be made available via <code>@julia_toolchains</code>.</p>
+<p><strong>Attributes</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia.toolchain-version"></a>version</td><td style="text-align: left">A Julia version (e.g. <code>1.12.5</code>). Select it with <code>--@rules_julia//julia/settings:version</code>.</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+</tbody></table>
+</div>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

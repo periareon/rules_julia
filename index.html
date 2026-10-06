@@ -163,15 +163,17 @@
 <pre><code class="language-python">bazel_dep(name = "rules_julia", version = "{version}")
 
 julia = use_extension("@rules_julia//julia:extensions.bzl", "julia")
-julia.toolchain(
-    name = "julia_toolchains",
-    version = "1.12.2",
-)
 use_repo(julia, "julia_toolchains")
 
 register_toolchains(
     "@julia_toolchains//:all",
 )
+</code></pre>
+<p>The default Julia version is always registered. To make additional versions
+available, request them and select one with the <code>version</code> setting:</p>
+<pre><code class="language-python">julia.toolchain(version = "1.11.9")
+</code></pre>
+<pre><code class="language-text">bazel build --@rules_julia//julia/settings:version=1.11.9 //...
 </code></pre>
 
                     </main>
