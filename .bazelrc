@@ -60,8 +60,9 @@ test --config=strict
 # A configuration for disabling bzlmod.
 common:no-bzlmod --noenable_bzlmod --enable_workspace
 
-# Disable the bzlmod lockfile, so we don't accidentally commit MODULE.bazel.lock
-common --lockfile_mode=off
+# Keep MODULE.bazel.lock committed and up to date. The `pkg` module extension
+# relies on it to persist facts (e.g. package integrity values) across runs.
+common --lockfile_mode=update
 
 ###############################################################################
 ## Custom user flags

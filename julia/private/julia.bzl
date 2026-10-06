@@ -18,10 +18,10 @@ def _julia_library_impl(ctx):
         transitive = [julia_common.collect_transitive_srcs(deps)],
     )
 
-    include = julia_common.get_include(ctx)
+    layout = julia_common.package_layout(ctx, ctx.files.srcs)
 
     includes = depset(
-        [include],
+        [layout.include],
         transitive = [julia_common.collect_includes(deps)],
     )
 
@@ -32,21 +32,55 @@ def _julia_library_impl(ctx):
         if DefaultInfo in dep:
             runfiles = runfiles.merge(dep[DefaultInfo].default_runfiles)
 
+    dep_depots = julia_common.collect_depots(deps)
+    depots = dep_depots
+    if _is_precompilable(ctx, layout):
+        toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
+        depot = julia_common.precompile(
+            ctx,
+            name = ctx.label.name,
+            includes = includes,
+            runfiles = runfiles,
+            dep_depots = dep_depots,
+            toolchain_info = toolchain_info,
+        )
+        depots = depset([depot], transitive = [dep_depots])
+        runfiles = runfiles.merge(ctx.runfiles(files = [depot]))
+
     return [
         JuliaInfo(
             app_name = ctx.label.name,
             srcs = srcs,
-            deps = depset(direct = deps),
             transitive_srcs = transitive_srcs,
-            include = include,
+            include = layout.include,
             includes = includes,
             runfiles = runfiles,
+            depots = depots,
+            entry = layout.entry,
         ),
         DefaultInfo(
             files = srcs,
             default_runfiles = runfiles,
         ),
     ]
+
+def _is_precompilable(ctx, layout):
+    """Whether a `julia_library` can be precompiled.
+
+    Args:
+        ctx: Rule context.
+        layout (struct): The library's package layout.
+
+    Returns:
+        bool: True if precompilation is enabled, the library has a package
+            entry point, and the toolchain supports relocatable
+            (`@depot`-relative) caches, which requires Julia 1.11.
+    """
+    return (
+        ctx.attr.precompile and
+        layout.entry != None and
+        julia_common.version_gte(ctx.toolchains[TOOLCHAIN_TYPE].version, "1.11.0")
+    )
 
 julia_library = rule(
     doc = "A sharable Julia library or module.",
@@ -60,13 +94,27 @@ julia_library = rule(
             doc = "Other Julia libraries this target depends on",
             providers = [JuliaInfo],
         ),
+        "precompile": attr.bool(
+            doc = (
+                "Precompile the library at build time. The resulting cache is placed on " +
+                "`DEPOT_PATH` for every binary and test that depends on this library. " +
+                "Requires the module entry point `<name>.jl` (typically `src/<name>.jl`) " +
+                "and Julia 1.11+; otherwise no cache is produced."
+            ),
+            default = True,
+        ),
         "srcs": attr.label_list(
             doc = "Julia source files (.jl files)",
             allow_files = [".jl"],
             mandatory = True,
         ),
-    },
+        "_precompiler": attr.label(
+            default = Label("//julia/private:precompile.jl"),
+            allow_single_file = True,
+        ),
+    } | julia_common.DRIVER_ATTRS,
     provides = [JuliaInfo],
+    toolchains = [TOOLCHAIN_TYPE],
 )
 
 def _julia_binary_impl(ctx):
@@ -109,15 +157,7 @@ julia_binary = rule(
             allow_files = [".jl"],
             mandatory = True,
         ),
-        "_entrypoint": attr.label(
-            default = Label("//julia/private:entrypoint.jl"),
-            allow_single_file = True,
-        ),
-        "_wrapper_template": attr.label(
-            default = Label("//julia/private:binary_wrapper.tpl"),
-            allow_single_file = True,
-        ),
-    },
+    } | julia_common.BINARY_ATTRS,
     provides = [JuliaInfo],
     executable = True,
     toolchains = [TOOLCHAIN_TYPE],
@@ -163,15 +203,7 @@ julia_test = rule(
             allow_files = [".jl"],
             mandatory = True,
         ),
-        "_entrypoint": attr.label(
-            default = Label("//julia/private:entrypoint.jl"),
-            allow_single_file = True,
-        ),
-        "_wrapper_template": attr.label(
-            default = Label("//julia/private:binary_wrapper.tpl"),
-            allow_single_file = True,
-        ),
-    },
+    } | julia_common.BINARY_ATTRS,
     provides = [JuliaInfo],
     test = True,
     toolchains = [TOOLCHAIN_TYPE],

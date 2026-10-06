@@ -4,7 +4,8 @@ JuliaInfo = provider(
     doc = "Information about a Julia library or binary target.",
     fields = {
         "app_name": "str: The Julia project app name.",
-        "deps": "depset[JuliaInfo]: of Julia dependencies",
+        "depots": "depset[File]: Depot directories holding build-time precompile caches of this target and its dependencies.",
+        "entry": "Optional[File]: The package entry point `<include>/<name>.jl`, if the target has one.",
         "include": "str: The include path of the current target.",
         "includes": "depset[str]: of include paths",
         "runfiles": "depset[File]: runfiles for this target",

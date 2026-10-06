@@ -47,7 +47,13 @@ def _pkg_impl(module_ctx):
     root_module_direct_deps = []
     root_module_direct_dev_deps = []
 
-    for mod in module_ctx.modules:
+    # Every module's hubs are created. The root module is processed first so
+    # its hubs are defined before any dependency's; a hub name declared by more
+    # than one module is an error rather than a silent override.
+    modules = sorted(module_ctx.modules, key = lambda mod: 0 if mod.is_root else 1)
+    hub_owners = {}
+
+    for mod in modules:
         # Collect annotations from pkg_annotation tags in this module
         # Annotations apply to all install tags in the same module
         annotations = {}
@@ -66,12 +72,29 @@ def _pkg_impl(module_ctx):
 
         # Process install tags with their annotations
         for install_attrs in mod.tags.install:
+            owner = hub_owners.get(install_attrs.name)
+            if owner != None:
+                fail("The `pkg` hub `{}` is declared by both module `{}` and module `{}`. Hub names must be unique.".format(
+                    install_attrs.name,
+                    owner,
+                    mod.name,
+                ))
+            hub_owners[install_attrs.name] = mod.name
+
             hub = install(
                 module_ctx = module_ctx,
                 attrs = install_attrs,
                 annotations = annotations,
             )
-            root_module_direct_deps.append(hub)
+
+            # Only the root module's hubs are reported as its direct deps. Hubs
+            # from other modules (e.g. rules_julia's own) must not be reported or
+            # every downstream root module would be told to `use_repo` them.
+            if mod.is_root:
+                if module_ctx.is_dev_dependency(install_attrs):
+                    root_module_direct_dev_deps.append(hub)
+                else:
+                    root_module_direct_deps.append(hub)
 
     return module_ctx.extension_metadata(
         reproducible = True,

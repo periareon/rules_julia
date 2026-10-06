@@ -25,29 +25,12 @@ call :rlocation "{entrypoint}" ENTRYPOINT
 call :rlocation "{config}" CONFIG
 call :rlocation "{main}" MAIN
 
-@REM Create a writable depot for any runtime compilation needs
-if not "%RUNFILES_DIR%"=="" (
-    for %%F in ("%RUNFILES_DIR%") do set "RUNFILES_PARENT=%%~dpF"
-    set "RUNFILES_PARENT=%RUNFILES_PARENT:~0,-1%"
-    for %%F in ("%RUNFILES_PARENT%") do set "RUNFILES_PARENT=%%~dpF"
-    set "RUNFILES_PARENT=%RUNFILES_PARENT:~0,-1%"
-    set "WRITABLE_DEPOT=%RUNFILES_PARENT%\.depot"
-) else if not "%RUNFILES_MANIFEST_FILE%"=="" (
-    for %%F in ("%RUNFILES_MANIFEST_FILE%") do set "MANIFEST_PARENT=%%~dpF"
-    set "MANIFEST_PARENT=%MANIFEST_PARENT:~0,-1%"
-    for %%F in ("%MANIFEST_PARENT%") do set "MANIFEST_PARENT=%%~dpF"
-    set "MANIFEST_PARENT=%MANIFEST_PARENT:~0,-1%"
-    set "WRITABLE_DEPOT=%MANIFEST_PARENT%\.depot"
+@REM Scratch depot for any run-time compilation. Never write into the output tree.
+if defined TEST_TMPDIR (
+    set "WRITABLE_DEPOT=%TEST_TMPDIR%\rules_julia_depot"
 ) else (
-    echo>&2 ERROR: Neither RUNFILES_DIR nor RUNFILES_MANIFEST_FILE is set
-    exit 1
+    set "WRITABLE_DEPOT=%TEMP%\rules_julia_depot"
 )
-
-@REM Ensure writable depot path is absolute
-if "%WRITABLE_DEPOT:~1,1%" equ ":" goto :writable_path_is_absolute
-if "%WRITABLE_DEPOT:~0,2%" equ "\\" goto :writable_path_is_absolute
-set "WRITABLE_DEPOT=%CD%\%WRITABLE_DEPOT%"
-:writable_path_is_absolute
 
 @REM Unset `RUNFILES_DIR` if the directory does not exist.
 if not "%RUNFILES_DIR%"=="" (
@@ -56,10 +39,15 @@ if not "%RUNFILES_DIR%"=="" (
     )
 )
 
-@REM Trailing semicolon causes Julia to append its system depot (stdlib compiled caches).
+@REM The trailing empty entry expands to Julia's bundled depots (stdlib caches)
+@REM and excludes the user depot.
 set "JULIA_DEPOT_PATH=%WRITABLE_DEPOT%;"
 
-set "RULES_JULIA_DEPOT_PATH=%WRITABLE_DEPOT%"
+@REM Only the active project and the stdlib are visible. Library include paths
+@REM are appended by the entrypoint. Nothing from the caller's shell leaks in.
+set "JULIA_LOAD_PATH=@;@stdlib"
+set "JULIA_PROJECT="
+
 set "JULIA_PKG_PRECOMPILE_AUTO=0"
 
 @REM Check if BAZEL_TEST is set in the environment and if so set JULIA_PKG_OFFLINE=true
@@ -67,12 +55,25 @@ if defined BAZEL_TEST (
     set "JULIA_PKG_OFFLINE=true"
 )
 
-@REM Default to no compiled modules. Opt in with RULES_JULIA_COMPILED_MODULES=1.
-set "COMPILED_MODULES=no"
-if "%RULES_JULIA_COMPILED_MODULES%"=="1" set "COMPILED_MODULES=yes"
+@REM Libraries are precompiled at build time and found via DEPOT_PATH. Tests
+@REM never write caches: anything without a build-time cache is evaluated from
+@REM source. `bazel run` keeps a persistent scratch depot and may compile into it.
+@REM Override with RULES_JULIA_COMPILED_MODULES=yes|no|existing|strict.
+set "COMPILED_MODULES=yes"
+if defined BAZEL_TEST set "COMPILED_MODULES={test_compiled_modules}"
+if not "%RULES_JULIA_COMPILED_MODULES%"=="" set "COMPILED_MODULES=%RULES_JULIA_COMPILED_MODULES%"
+
+@REM Optional custom system image.
+set "SYSIMAGE={sysimage}"
+set "SYSIMAGE_FLAGS="
+if not "%SYSIMAGE%"=="" (
+    call :rlocation "%SYSIMAGE%" SYSIMAGE_PATH
+    set "SYSIMAGE_FLAGS=--sysimage=!SYSIMAGE_PATH!"
+)
 
 @REM Execute Julia with the entrypoint
 "%INTERPRETER%" ^
+    %SYSIMAGE_FLAGS% ^
     --compiled-modules=%COMPILED_MODULES% ^
     "%ENTRYPOINT%" ^
     "%CONFIG%" ^

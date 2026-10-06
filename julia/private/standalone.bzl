@@ -1,66 +1,94 @@
 """Julia standalone binary rules"""
 
-load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
-load(
-    ":project_toml_aspect.bzl",
-    "JuliaProjectTomlInfo",
-    "get_project_include",
-    "julia_project_toml_aspect",
-)
+load(":julia_common.bzl", "julia_common")
 load(":providers.bzl", "JuliaInfo")
-load(":rlocation.bzl", "rlocationpath")
 load(":toolchain.bzl", "TOOLCHAIN_TYPE")
 
-_rlocationpath = rlocationpath
+# Resources declared for `JuliaSysimage`. Emitting the system image object
+# (`julia --output-o`) regenerates native code for the whole image and is the
+# irreducible step; it parallelizes via `JULIA_IMAGE_THREADS`, so the thread
+# count and the declared CPUs are kept in sync. Memory was measured on Julia
+# 1.12.5 / x86_64 Linux at 7.8 GB peak with four threads, with headroom added.
+_IMAGE_THREADS = 4
+_MEMORY_MB = 10240
 
-def _julia_standalone_binary_impl(ctx):
-    # Get the binary target
-    binary = ctx.attr.binary
-    julia_info = binary[JuliaInfo]
+def _sysimage_resource_set(_os_name, _inputs_size):
+    return {"cpu": _IMAGE_THREADS, "memory": _MEMORY_MB}
 
-    # Get all source files (direct and transitive)
-    all_srcs = julia_info.transitive_srcs.to_list()
+def _emit_sysimage_object(ctx, *, julia_info, toolchain_info):
+    """Run `julia --output-o` to emit the object archive of a system image.
 
-    # Get toolchain for Julia runtime
-    toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
+    Args:
+        ctx: Rule context.
+        julia_info (JuliaInfo): Provider of the package to include.
+        toolchain_info (ToolchainInfo): The Julia toolchain.
 
-    # Declare explicit outputs: app/, lib/, share/ directories and wrapper script
-    is_windows = ctx.file._template.basename.endswith(".bat.tpl")
-    script_ext = ".bat" if is_windows else ".sh"
-    bin_ext = ".exe" if is_windows else ""
+    Returns:
+        File: The object archive.
+    """
+    name = ctx.label.name
+    archive = ctx.actions.declare_file("{}.sysimage.a".format(name))
+    config = julia_common.create_config_file(
+        ctx,
+        julia_info.includes,
+        julia_info.runfiles,
+        julia_info.depots,
+        name = name + ".sysimage",
+    )
+    manifest = julia_common.write_runfiles_manifest(
+        ctx,
+        "{}.sysimage_manifest".format(name),
+        julia_info.runfiles.files,
+    )
 
-    output_bin_main = ctx.actions.declare_file("{}/bin/{}{}".format(ctx.label.name, julia_info.app_name, bin_ext))
-    output_bin_julia = ctx.actions.declare_file("{}/bin/julia{}".format(ctx.label.name, bin_ext))
-    output_lib_dir = ctx.actions.declare_directory("{}/lib".format(ctx.label.name))
-    output_share_dir = ctx.actions.declare_directory("{}/share".format(ctx.label.name))
-    output_wrapper = ctx.actions.declare_file("{}{}".format(ctx.label.name, script_ext))
-
-    runfiles_manifest = ctx.attr.binary[DefaultInfo].files_to_run.runfiles_manifest
-
-    project_toml_info = binary[JuliaProjectTomlInfo]
-    if not project_toml_info.main:
-        fail("{} did not produce `main`.", binary.label)
-
-    # Build the arguments for the compiler
-    # Point output to the parent directory so PackageCompiler creates app/, lib/, share/ subdirectories
-    output_parent_dir = output_lib_dir.dirname
     args = ctx.actions.args()
-    args.add("--app-name", julia_info.app_name)
-    args.add("--project-root", get_project_include(julia_info))
-    args.add("--project-bin", _rlocationpath(project_toml_info.main, ctx.workspace_name))
-    args.add("--project-root-toml", project_toml_info.root_project)
-    args.add("--output", output_parent_dir)
-    args.add("--runfiles-manifest", runfiles_manifest)
+    args.add("--config", config)
+    args.add("--manifest", manifest)
+    args.add("--package", julia_info.app_name)
+    args.add_all(ctx.files.precompile_statements, before_each = "--precompile-statements")
 
-    args.add("--project-toml", "{}={}".format(_rlocationpath(project_toml_info.root_project, ctx.workspace_name), project_toml_info.root_project.path))
-    for dep_project_toml in project_toml_info.dep_projects.values():
-        # Get the runfiles path for the Project.toml file
-        toml_path = _rlocationpath(dep_project_toml, ctx.workspace_name)
-        args.add("--project-toml", "{}={}".format(toml_path, dep_project_toml.path))
+    julia_flags = [
+        "--history-file=no",
+        "--threads=1",
+        "--cpu-target=" + (ctx.attr.cpu_target or toolchain_info.cpu_target),
+        "--sysimage=" + toolchain_info.sysimage.path,
+        "--output-o=" + archive.path,
+    ]
 
-    # Get C++ toolchain for PackageCompiler's C compilation needs
+    julia_common.run_driver(
+        ctx,
+        toolchain_info = toolchain_info,
+        driver = ctx.file._sysimage_driver,
+        arguments = args,
+        inputs = depset(
+            [config, manifest] + ctx.files.precompile_statements,
+            transitive = [julia_info.runfiles.files],
+        ),
+        outputs = [archive],
+        mnemonic = "JuliaSysimage",
+        julia_flags = julia_flags,
+        env = {
+            "JULIA_IMAGE_THREADS": str(_IMAGE_THREADS),
+            "OPENBLAS_NUM_THREADS": "1",
+        },
+        resource_set = _sysimage_resource_set,
+    )
+
+    return archive
+
+def _link_sysimage(ctx, *, archive, toolchain_info):
+    """Link a system image object archive into a shared library using the C++ toolchain.
+
+    Args:
+        ctx: Rule context.
+        archive (File): The object archive from `julia --output-o`.
+        toolchain_info (ToolchainInfo): The Julia toolchain.
+
+    Returns:
+        File: The shared library (the system image).
+    """
     cc_toolchain = find_cc_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
@@ -69,164 +97,125 @@ def _julia_standalone_binary_impl(ctx):
         unsupported_features = ctx.disabled_features,
     )
 
-    # Create compile variables for the CC toolchain
-    compile_variables = cc_common.create_compile_variables(
+    # Every object in the archive must end up in the image.
+    library = cc_common.create_library_to_link(
+        actions = ctx.actions,
         feature_configuration = feature_configuration,
         cc_toolchain = cc_toolchain,
+        static_library = archive,
+        alwayslink = True,
     )
 
-    # Get CC compile arguments and environment
-    cc_c_args = cc_common.get_memory_inefficient_command_line(
+    libdirs = {lib.dirname: None for lib in toolchain_info.link_files.to_list()}
+    linker_input = cc_common.create_linker_input(
+        owner = ctx.label,
+        libraries = depset([library]),
+        user_link_flags = ["-L" + libdir for libdir in libdirs] + ["-ljulia", "-ljulia-internal"],
+        additional_inputs = toolchain_info.link_files,
+    )
+
+    linking_outputs = cc_common.link(
+        actions = ctx.actions,
+        name = "{}.sysimage".format(ctx.label.name),
         feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.c_compile,
-        variables = compile_variables,
-    )
-    cc_cxx_args = cc_common.get_memory_inefficient_command_line(
-        feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.cpp_compile,
-        variables = compile_variables,
-    )
-    cc_env = cc_common.get_environment_variables(
-        feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.c_compile,
-        variables = compile_variables,
+        cc_toolchain = cc_toolchain,
+        output_type = "dynamic_library",
+        linking_contexts = [cc_common.create_linking_context(
+            linker_inputs = depset([linker_input]),
+        )],
     )
 
-    # Build environment for compilation
-    env = {}
+    return linking_outputs.library_to_link.dynamic_library
 
-    # Set up CC toolchain environment variables for PackageCompiler
-    # These paths will be resolved in standalone_compiler.jl
-    env["CC"] = cc_common.get_tool_for_action(
-        feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.c_compile,
-    )
-    env["CXX"] = cc_common.get_tool_for_action(
-        feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.cpp_compile,
-    )
-    env["AR"] = cc_common.get_tool_for_action(
-        feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.cpp_link_static_library,
-    )
+def _julia_standalone_binary_impl(ctx):
+    toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
+    if not toolchain_info.sysimage:
+        fail("The Julia toolchain for {} does not provide a stock system image.".format(ctx.label))
 
-    # Set compiler flags
-    env["CFLAGS"] = " ".join(cc_c_args)
-    env["CXXFLAGS"] = " ".join(cc_cxx_args)
+    binary = ctx.attr.binary
+    julia_info = binary[JuliaInfo]
+    package = julia_info.app_name
+    if not julia_info.entry:
+        fail((
+            "{} must be a Julia package: its entry point must be `{}/{}.jl` " +
+            "and define `module {}` with a `julia_main()::Cint` function."
+        ).format(binary.label, julia_info.include, package, package))
 
-    # Add any additional CC environment variables (e.g., INCLUDE on Windows)
-    env.update(cc_env)
+    archive = _emit_sysimage_object(ctx, julia_info = julia_info, toolchain_info = toolchain_info)
+    sysimage = _link_sysimage(ctx, archive = archive, toolchain_info = toolchain_info)
 
-    # Add action env
-    env.update(ctx.configuration.default_shell_env)
-
-    # Collect Project.toml and Manifest.toml files from the aspect for build inputs
-    project_toml_files = depset([project_toml_info.root_project], transitive = [depset(project_toml_info.dep_projects.values())])
-    manifest_toml_files = depset([project_toml_info.root_manifest], transitive = [depset(project_toml_info.dep_manifests.values())])
-
-    # Collect all inputs including C++ toolchain files for sandbox
-    # Manifest files are needed as inputs since they're referenced by the compiler
-    inputs = depset(
-        direct = all_srcs + [runfiles_manifest],
-        transitive = [binary[DefaultInfo].default_runfiles.files, project_toml_files, manifest_toml_files],
+    main = ctx.actions.declare_file("{}.main.jl".format(ctx.label.name))
+    ctx.actions.write(
+        output = main,
+        content = "import {pkg}\nexit({pkg}.julia_main())\n".format(pkg = package),
     )
 
-    ctx.actions.run(
-        mnemonic = "JuliaStandaloneCompile",
-        executable = ctx.executable._compiler,
-        arguments = [args],
-        outputs = [output_bin_main, output_bin_julia, output_lib_dir, output_share_dir],
-        inputs = inputs,
-        progress_message = "Compiling Julia standalone app {}".format(julia_info.app_name),
-        env = env | {
-            "JULIA_PKG_OFFLINE": "true",
-        },
-        tools = depset(transitive = [toolchain_info.all_files, cc_toolchain.all_files]),
-        # TODO: https://github.com/periareon/rules_julia/issues/2
-        # This action should not need this.
-        use_default_shell_env = True,
+    return julia_common.create_julia_binary_impl(
+        ctx = ctx,
+        srcs = [main],
+        deps = [binary],
+        data_files = [],
+        data_targets = [],
+        env = {},
+        main = main,
+        sysimage = sysimage,
     )
-
-    ctx.actions.expand_template(
-        template = ctx.file._template,
-        output = output_wrapper,
-        substitutions = {
-            "{rules_julia_standalone_app}": _rlocationpath(output_bin_main, ctx.workspace_name),
-        },
-        is_executable = True,
-    )
-
-    return [
-        DefaultInfo(
-            executable = output_wrapper,
-            files = depset([
-                output_bin_main,
-                output_bin_julia,
-                output_lib_dir,
-                output_share_dir,
-                output_wrapper,
-            ]),
-            runfiles = ctx.runfiles(files = [
-                output_bin_main,
-                output_bin_julia,
-                output_lib_dir,
-                output_share_dir,
-                output_wrapper,
-            ]),
-        ),
-    ]
 
 julia_standalone_binary = rule(
-    doc = """A rule for converting a `julia_binary` to a standalone application.
+    doc = """\
+Build a Julia package and its dependencies into a custom system image and
+produce an executable that starts Julia with it.
 
-    This rule uses PackageCompiler.jl to create a standalone executable that includes
-    the Julia runtime and all dependencies. The resulting application can be
-    distributed and run on machines without Julia installed.
+The system image is produced in two actions: `julia --output-o` emits the
+object archive of the image, which the C++ toolchain links into a shared
+library. The executable is the regular Julia wrapper started with
+`--sysimage`, so all code is loaded precompiled and startup is immediate.
+No network access or host tools outside the Bazel toolchains are involved.
 
-    Dependencies are provided hermetically through Bazel - no network access required!
-    PackageCompiler.jl and all Julia package dependencies are managed through the
-    Bazel build system.
+The target in `binary` must be a Julia package: its entry point is
+`src/<name>.jl` defining `module <name>` with a `julia_main()::Cint` function,
+which is called with the command line arguments in `ARGS`.
 
-    Example:
+Example:
 
-    ```python
-    julia_binary(
-        name = "my_app_bin",
-        srcs = ["my_app.jl"],
-        deps = ["//my/lib"],
-    )
+```python
+julia_binary(
+    name = "my_app_bin",
+    srcs = ["src/my_app_bin.jl"],
+    deps = ["//my/lib"],
+)
 
-    julia_standalone_binary(
-        name = "my_app",
-        binary = ":my_app_bin",
-    )
-    ```
-    """,
+julia_standalone_binary(
+    name = "my_app",
+    binary = ":my_app_bin",
+)
+```
+""",
     implementation = _julia_standalone_binary_impl,
     attrs = {
         "binary": attr.label(
-            doc = "The julia_binary target to convert into a standalone application",
+            doc = "The `julia_binary` (or `julia_library`) package to build into the system image.",
             mandatory = True,
-            executable = True,
-            cfg = "target",
-            aspects = [julia_project_toml_aspect],
             providers = [JuliaInfo],
         ),
-        "_cc_toolchain": attr.label(
-            default = Label("@rules_cc//cc:current_cc_toolchain"),
+        "cpu_target": attr.string(
+            doc = (
+                "The `--cpu-target` to compile the system image for. Defaults to the " +
+                "toolchain's portable multi-versioned target for its architecture."
+            ),
         ),
-        "_compiler": attr.label(
-            doc = "The standalone compiler script.",
-            executable = True,
-            cfg = "exec",
-            default = Label("//julia/private/standalone_compiler"),
+        "precompile_statements": attr.label_list(
+            doc = (
+                "Files of precompile statements (as produced by `julia --trace-compile`) " +
+                "whose methods are compiled into the system image."
+            ),
+            allow_files = True,
         ),
-        "_template": attr.label(
-            cfg = "target",
+        "_sysimage_driver": attr.label(
+            default = Label("//julia/private:sysimage.jl"),
             allow_single_file = True,
-            default = Label("//julia/private/standalone_compiler:standalone_wrapper.tpl"),
         ),
-    },
+    } | julia_common.BINARY_ATTRS,
     executable = True,
     toolchains = [
         TOOLCHAIN_TYPE,

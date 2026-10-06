@@ -6,6 +6,9 @@ exports_files([
     "binary_wrapper.sh.tpl",
     "binary_wrapper_maker.jl",
     "entrypoint.jl",
+    "precompile.jl",
+    "rules_julia_common.jl",
+    "sysimage.jl",
 ])
 
 # This target exists only to get picked up by the formatter.
@@ -31,6 +34,7 @@ bzl_library(
     visibility = ["//julia:__pkg__"],
     deps = [
         "//julia/settings:settings_bzl",
+        "@bazel_skylib//lib:dicts",
         "@rules_cc//cc/common",
     ],
 )

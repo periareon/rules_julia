@@ -91,10 +91,6 @@ the test will fail with detailed error messages indicating what needs to be fixe
             providers = [JuliaPkgCompileInfo],
             mandatory = True,
         ),
-        "_entrypoint": attr.label(
-            default = Label("//julia/private:entrypoint.jl"),
-            allow_single_file = True,
-        ),
         "_test_runner": attr.label(
             doc = "The pkg test runner binary.",
             cfg = "target",
@@ -106,11 +102,7 @@ the test will fail with detailed error messages indicating what needs to be fixe
             allow_single_file = [".jl"],
             default = Label("//julia/pkg/private:pkg_tester.jl"),
         ),
-        "_wrapper_template": attr.label(
-            default = Label("//julia/private:binary_wrapper.tpl"),
-            allow_single_file = True,
-        ),
-    },
+    } | julia_common.BINARY_ATTRS,
     test = True,
     toolchains = [julia_common.TOOLCHAIN_TYPE],
 )

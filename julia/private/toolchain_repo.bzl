@@ -20,22 +20,80 @@ TRIPLET_TO_CONSTRAINTS = {
 
 JULIA_VERSIONS = _JULIA_VERSIONS
 
+# Default `--cpu-target` per architecture. These match the multi-versioned
+# targets used by Julia's release binaries and PackageCompiler apps, so a
+# system image built on one machine runs on any machine of the architecture.
+_CPU_TARGETS = {
+    "aarch64": "generic",
+    "i686": "pentium4;sandybridge,-xsaveopt,clone_all",
+    "powerpc64le": "pwr8",
+    "x86_64": "generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)",
+}
+
 _JULIA_TOOLCHAIN_BUILD_FILE_CONTENT = """\
 load("@rules_julia//julia:julia_toolchain.bzl", "julia_toolchain")
+
+# Everything needed to run `julia`: the executable, shared libraries, the
+# system image, stdlib sources and their compiled caches, and certificates.
+filegroup(
+    name = "runtime_files",
+    srcs = glob(
+        include = [
+            "bin/**",
+            "etc/**",
+            "lib/**",
+            "libexec/**",
+            "share/julia/**",
+        ],
+        exclude = [
+            "share/julia/juliac/**",
+            "share/julia/test/**",
+        ],
+    ),
+    visibility = ["//visibility:public"],
+)
 
 filegroup(
     name = "julia_bin",
     srcs = ["{julia_bin}"],
-    data = glob(
-        include = ["**"],
-        exclude = ["WORKSPACE", "BUILD", "*.bazel"],
+    data = [":runtime_files"],
+    visibility = ["//visibility:public"],
+)
+
+# The stock system image. Custom images are built on top of it.
+filegroup(
+    name = "sysimage",
+    srcs = glob(
+        include = [
+            "lib/julia/sys.dll",
+            "lib/julia/sys.dylib",
+            "lib/julia/sys.so",
+        ],
+        allow_empty = True,
+    ),
+    visibility = ["//visibility:public"],
+)
+
+# The libraries a system image links against.
+filegroup(
+    name = "link_files",
+    srcs = glob(
+        include = [
+            "bin/libjulia*.dll",
+            "lib/julia/libjulia-internal*",
+            "lib/libjulia*",
+        ],
+        allow_empty = True,
     ),
     visibility = ["//visibility:public"],
 )
 
 julia_toolchain(
     name = "toolchain",
+    cpu_target = "{cpu_target}",
     julia = ":julia_bin",
+    link_files = [":link_files"],
+    sysimage = ":sysimage",
     version = "{version}",
     visibility = ["//visibility:public"],
 )
@@ -76,6 +134,7 @@ def julia_toolchain_repository(*, name, version, triplet, url, integrity):
         integrity = integrity,
         strip_prefix = strip_prefix,
         build_file_content = _JULIA_TOOLCHAIN_BUILD_FILE_CONTENT.format(
+            cpu_target = _CPU_TARGETS.get(triplet.split("-")[0], "generic"),
             name = name,
             julia_bin = julia_bin,
             version = version,
