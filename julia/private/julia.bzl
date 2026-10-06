@@ -18,10 +18,10 @@ def _julia_library_impl(ctx):
         transitive = [julia_common.collect_transitive_srcs(deps)],
     )
 
-    layout = julia_common.package_layout(ctx, ctx.files.srcs)
+    layout = julia_common.package_layout(ctx, ctx.files.srcs, data)
 
     includes = depset(
-        [layout.include],
+        layout.includes,
         transitive = [julia_common.collect_includes(deps)],
     )
 
@@ -33,6 +33,7 @@ def _julia_library_impl(ctx):
             runfiles = runfiles.merge(dep[DefaultInfo].default_runfiles)
 
     dep_depots = julia_common.collect_depots(deps)
+    artifact_depots = julia_common.collect_artifact_depots(deps)
     depots = dep_depots
     if _is_precompilable(ctx, layout):
         toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
@@ -43,6 +44,7 @@ def _julia_library_impl(ctx):
             runfiles = runfiles,
             dep_depots = dep_depots,
             toolchain_info = toolchain_info,
+            artifact_depots = artifact_depots,
         )
         depots = depset([depot], transitive = [dep_depots])
         runfiles = runfiles.merge(ctx.runfiles(files = [depot]))
@@ -56,6 +58,7 @@ def _julia_library_impl(ctx):
             includes = includes,
             runfiles = runfiles,
             depots = depots,
+            artifact_depots = artifact_depots,
             entry = layout.entry,
         ),
         DefaultInfo(

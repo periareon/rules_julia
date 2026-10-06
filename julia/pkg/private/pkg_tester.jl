@@ -1,144 +1,19 @@
 """
-Julia Package Lockfile Test
+Julia Package Lockfile Test driver
 
-This script verifies that Manifest.bazel.json is in sync with Manifest.toml.
-Since we can't use external JSON packages, we do basic validation checks.
+Runs `pkg_tester_core.jl` once per manifest, each time with the Julia that
+the manifest is declared for, so every manifest is verified by the Pkg that
+resolved it. Runfiles are resolved here and passed on as absolute paths.
 """
 
-using Pkg
 using Runfiles: rlocation
 
-function parse_args()
-    """Parse command-line arguments from environment variables."""
-    args = Dict{String,Any}()
-
-    # Required environment variables set by the Bazel rule
-    required_vars =
-        ["RULES_JULIA_PKG_TEST_MANIFEST_TOML", "RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON"]
-
-    for var in required_vars
-        if !haskey(ENV, var)
-            error("Environment variable $var is not set")
-        end
-        # Convert to absolute path
-        key = lowercase(replace(var, "RULES_JULIA_PKG_TEST_" => ""))
-        args[key] = rlocation(ENV[var])
+function locate(rlocationpath::String)
+    path = rlocation(rlocationpath)
+    if path === nothing || !ispath(path)
+        error("Failed to locate runfile: $rlocationpath")
     end
-
-    return args
-end
-
-function parse_manifest_toml(manifest_path::String)
-    """Parse Manifest.toml and extract package information."""
-    manifest = Pkg.Types.read_manifest(manifest_path)
-
-    packages = Dict{String,Any}()
-
-    for (uuid, pkg_entry) in manifest
-        # Skip Julia stdlib packages (they don't have a tree hash)
-        if !isdefined(pkg_entry, :tree_hash) || isnothing(pkg_entry.tree_hash)
-            continue
-        end
-
-        name = pkg_entry.name
-        tree_hash = string(pkg_entry.tree_hash)
-        version = string(pkg_entry.version)
-        uuid_str = string(uuid)
-
-        packages[name] =
-            Dict("uuid" => uuid_str, "version" => version, "git-tree-sha1" => tree_hash)
-    end
-
-    return packages
-end
-
-function check_lockfile_basic(lockfile_path::String, toml_packages::Dict)
-    """Do basic validation checks on the lockfile."""
-    errors = String[]
-    content = read(lockfile_path, String)
-
-    # Check that the file is valid JSON (basic check)
-    if !startswith(strip(content), "{") || !endswith(strip(content), "}")
-        push!(errors, "Manifest.bazel.json is not a valid JSON object")
-        return errors
-    end
-
-    # Check that each package from TOML is mentioned in the JSON
-    for (name, toml_data) in toml_packages
-        # Check package name exists
-        if !contains(content, "\"$name\"")
-            push!(
-                errors,
-                "Package '$name' from Manifest.toml not found in Manifest.bazel.json",
-            )
-            continue
-        end
-
-        # Check version is mentioned
-        version = toml_data["version"]
-        if !contains(content, "\"version\": \"$version\"")
-            push!(
-                errors,
-                "Package '$name': version '$version' from Manifest.toml not found in Manifest.bazel.json",
-            )
-        end
-
-        # Check UUID is mentioned
-        uuid = toml_data["uuid"]
-        if !contains(content, "\"uuid\": \"$uuid\"")
-            push!(
-                errors,
-                "Package '$name': UUID '$uuid' from Manifest.toml not found in Manifest.bazel.json",
-            )
-        end
-
-        # Check git-tree-sha1 is in a URL
-        tree_hash = toml_data["git-tree-sha1"]
-        if !contains(content, tree_hash)
-            push!(
-                errors,
-                "Package '$name': git-tree-sha1 '$tree_hash' from Manifest.toml not found in any URL in Manifest.bazel.json",
-            )
-        end
-
-        # Check that SHA256 field exists for this package
-        # Look for the pattern after the package name
-        pkg_section_start = findfirst("\"$name\": {", content)
-        if pkg_section_start !== nothing
-            # Find the next closing brace
-            start_idx = pkg_section_start[end]
-            depth = 1
-            idx = start_idx + 1
-            pkg_section_end = start_idx
-
-            while idx <= length(content) && depth > 0
-                if content[idx] == '{'
-                    depth += 1
-                elseif content[idx] == '}'
-                    depth -= 1
-                    if depth == 0
-                        pkg_section_end = idx
-                    end
-                end
-                idx += 1
-            end
-
-            pkg_section = content[start_idx:pkg_section_end]
-            if !contains(pkg_section, "\"integrity\":")
-                push!(
-                    errors,
-                    "Package '$name': missing 'integrity' field in Manifest.bazel.json",
-                )
-            elseif contains(pkg_section, "\"integrity\": \"\"")
-                push!(
-                    errors,
-                    "Package '$name': 'integrity' field is empty in Manifest.bazel.json",
-                )
-            end
-        end
-    end
-
-    return errors
+    return path
 end
 
 function main()
@@ -146,79 +21,59 @@ function main()
     println("Julia Package Lockfile Verification Test")
     println("=" ^ 70)
 
-    manifest_toml_env = ENV["RULES_JULIA_PKG_TEST_MANIFEST_TOML"]
-    manifest_bazel_json_env = ENV["RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON"]
-
-    if manifest_toml_env === nothing
-        println("Error: RULES_JULIA_PKG_TEST_MANIFEST_TOML is not sent.")
-        exit(1)
+    core = locate(ENV["RULES_JULIA_PKG_TEST_CORE"])
+    project_toml = locate(ENV["RULES_JULIA_PKG_TEST_PROJECT_TOML"])
+    manifest_bazel_json = if haskey(ENV, "RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON")
+        locate(ENV["RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON"])
+    else
+        nothing
     end
 
-    if manifest_bazel_json_env === nothing
-        println("Error: RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON is not sent.")
-        exit(1)
-    end
+    entries = split(ENV["RULES_JULIA_PKG_TEST_MANIFESTS"], ";"; keepempty = false)
+    failures = String[]
+    for entry in entries
+        version, manifest_rlocation, julia_rlocation = split(entry, "|")
+        julia = locate(String(julia_rlocation))
+        manifest_toml = locate(String(manifest_rlocation))
 
-    manifest_toml = rlocation(ENV["RULES_JULIA_PKG_TEST_MANIFEST_TOML"])
-    manifest_bazel_json = rlocation(ENV["RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON"])
+        println("Manifest $(basename(manifest_toml)), declared for Julia $version")
 
-    if manifest_toml === nothing
-        println("Error: Failed to locate Manifest.toml runfile: $manifest_toml_env")
-        exit(1)
-    end
+        env = copy(ENV)
+        env["RULES_JULIA_PKG_TEST_PROJECT_TOML"] = project_toml
+        env["RULES_JULIA_PKG_TEST_MANIFEST_TOML"] = manifest_toml
+        env["RULES_JULIA_PKG_TEST_JULIA_VERSION"] = String(version)
+        if manifest_bazel_json !== nothing
+            env["RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON"] = manifest_bazel_json
+        else
+            delete!(env, "RULES_JULIA_PKG_TEST_MANIFEST_BAZEL_JSON")
+        end
+        env["JULIA_LOAD_PATH"] = "@stdlib"
+        delete!(env, "JULIA_PROJECT")
 
-    if manifest_bazel_json === nothing
-        println("Error: Failed to locate Bazel manifest runfile: $manifest_bazel_json")
-        exit(1)
-    end
-
-    # Check files exist
-    if !isfile(manifest_toml)
-        println("ERROR: Manifest.toml not found: $manifest_toml")
-        exit(1)
-    end
-
-    if !isfile(manifest_bazel_json)
-        println("ERROR: Manifest.bazel.json not found: $manifest_bazel_json")
-        exit(1)
-    end
-
-    # Parse Manifest.toml
-    println("Parsing Manifest.toml...")
-    toml_packages = parse_manifest_toml(manifest_toml)
-    println("  Found $(length(toml_packages)) non-stdlib packages")
-    println()
-
-    # Verify lockfile
-    println("Verifying Manifest.bazel.json...")
-    errors = check_lockfile_basic(manifest_bazel_json, toml_packages)
-
-    if isempty(errors)
+        cmd = Cmd(`$julia --startup-file=no --color=yes $core`; env = env)
+        if !success(run(ignorestatus(cmd)))
+            push!(failures, "$(basename(manifest_toml)) (Julia $version)")
+        end
         println()
+    end
+
+    if isempty(failures)
         println("=" ^ 70)
         println("SUCCESS: Manifest files are in sync!")
         println("=" ^ 70)
         exit(0)
-    else
-        println()
-        println("=" ^ 70)
-        println("FAILED: Manifest files are out of sync!")
-        println("=" ^ 70)
-        println()
-        println("Errors found:")
-        for (i, error) in enumerate(errors)
-            println("  $i. $error")
-        end
-        label = ENV["RULES_JULIA_PKG_TEST_COMPILER_LABEL"]
-        println()
-        println("Please run the pkg_compiler to regenerate the lockfile:")
-        println("  bazel run $(label)")
-        println("=" ^ 70)
-        exit(1)
     end
+
+    label = ENV["RULES_JULIA_PKG_TEST_COMPILER_LABEL"]
+    println("=" ^ 70)
+    println("FAILED: " * join(failures, ", "))
+    println()
+    println("Please run the pkg_compiler to regenerate the lockfile(s):")
+    println("  bazel run $(label)")
+    println("=" ^ 70)
+    exit(1)
 end
 
-# Run the test
 try
     main()
 catch e

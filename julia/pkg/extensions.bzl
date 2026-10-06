@@ -2,21 +2,58 @@
 
 load("//julia/pkg/private:pkg.bzl", "install")
 
+_DEFAULT_PKG_SERVER = "https://pkg.julialang.org"
+
 _install_tag = tag_class(
+    doc = """\
+Fetch the Julia packages recorded in one or more `Manifest.toml` files, or in a
+`Manifest.bazel.json`.
+
+Exactly one of `manifests` (or the single-file alias `manifest`) or `lockfile`
+must be set.
+
+With `manifests`, the stock `Manifest.toml` files written by `Pkg` are the only
+lockfiles. Each manifest records the Julia version that resolved it; its packages
+are built for that Julia minor version and marked incompatible with others, and the
+hub selects among manifests with `@rules_julia//julia/settings:version`. A project
+supporting several Julia versions lists one manifest per minor version (Pkg's
+`Manifest-v<major>.<minor>.toml` convention); `julia_pkg_compiler` resolves them all.
+Package tarballs are fetched from `pkg_server` using the UUID and git tree hash
+recorded for each package. On Bazel 9 and newer the integrity value of every tarball
+and the artifacts each package declares are persisted in the `facts` section of
+`MODULE.bazel.lock`, so after the first evaluation no network access is needed to
+evaluate the extension. On older Bazel versions the generated repositories are
+recorded in `MODULE.bazel.lock` instead.
+
+With `lockfile`, a `Manifest.bazel.json` produced by `julia_pkg_compiler` provides
+URLs, integrity values and artifacts up front and the extension never touches the
+network. The lockfile carries no Julia version, so its packages are available under
+every version. Prefer this for modules consumed by others, since facts are only
+persisted in the root module's lockfile.
+""",
     attrs = {
         "lockfile": attr.label(
-            doc = "The Manifest.bazel.json lockfile with SHA256 hashes for all packages.",
+            doc = "A `Manifest.bazel.json` lockfile produced by `julia_pkg_compiler`. Mutually exclusive with `manifests`.",
             allow_files = ["Manifest.bazel.json", ".json"],
-            mandatory = True,
+            mandatory = False,
         ),
         "manifest": attr.label(
-            doc = "The Manifest.toml lockfile associated with Project.toml (deprecated, use lockfile instead).",
+            doc = "A single `Manifest.toml`; shorthand for `manifests = [...]`.",
             allow_files = ["Manifest.toml", ".toml"],
             mandatory = False,
         ),
+        "manifests": attr.label_list(
+            doc = "`Manifest.toml` files, one per supported Julia minor version. Mutually exclusive with `lockfile`.",
+            allow_files = [".toml"],
+            mandatory = False,
+        ),
         "name": attr.string(
-            doc = "The name of the module to create",
+            doc = "The name of the hub repository to create.",
             mandatory = True,
+        ),
+        "pkg_server": attr.string(
+            doc = "The Julia package server to fetch tarballs from when `manifests` is set.",
+            default = _DEFAULT_PKG_SERVER,
         ),
     },
 )
@@ -47,13 +84,14 @@ def _pkg_impl(module_ctx):
     root_module_direct_deps = []
     root_module_direct_dev_deps = []
 
-    # Every module's hubs are created. The root module is processed first so
-    # its hubs are defined before any dependency's; a hub name declared by more
-    # than one module is an error rather than a silent override.
-    modules = sorted(module_ctx.modules, key = lambda mod: 0 if mod.is_root else 1)
-    hub_owners = {}
+    # Facts (Bazel 9+) persist package integrity values in `MODULE.bazel.lock`
+    # so `Manifest.toml` alone is enough to reproduce a build.
+    supports_facts = hasattr(module_ctx, "facts")
+    facts = module_ctx.facts if supports_facts else {}
+    new_facts = {}
+    from_manifest = False
 
-    for mod in modules:
+    for mod in module_ctx.modules:
         # Collect annotations from pkg_annotation tags in this module
         # Annotations apply to all install tags in the same module
         annotations = {}
@@ -72,38 +110,54 @@ def _pkg_impl(module_ctx):
 
         # Process install tags with their annotations
         for install_attrs in mod.tags.install:
-            owner = hub_owners.get(install_attrs.name)
-            if owner != None:
-                fail("The `pkg` hub `{}` is declared by both module `{}` and module `{}`. Hub names must be unique.".format(
-                    install_attrs.name,
-                    owner,
-                    mod.name,
-                ))
-            hub_owners[install_attrs.name] = mod.name
-
-            hub = install(
+            result = install(
                 module_ctx = module_ctx,
                 attrs = install_attrs,
                 annotations = annotations,
+                facts = facts,
             )
-
-            # Only the root module's hubs are reported as its direct deps. Hubs
-            # from other modules (e.g. rules_julia's own) must not be reported or
-            # every downstream root module would be told to `use_repo` them.
+            new_facts.update(result.facts)
+            from_manifest = from_manifest or result.from_manifest
             if mod.is_root:
                 if module_ctx.is_dev_dependency(install_attrs):
-                    root_module_direct_dev_deps.append(hub)
+                    root_module_direct_dev_deps.append(result.hub)
                 else:
-                    root_module_direct_deps.append(hub)
+                    root_module_direct_deps.append(result.hub)
 
-    return module_ctx.extension_metadata(
-        reproducible = True,
-        root_module_direct_deps = root_module_direct_deps,
-        root_module_direct_dev_deps = root_module_direct_dev_deps,
-    )
+    metadata_kwargs = {
+        "root_module_direct_deps": root_module_direct_deps,
+        "root_module_direct_dev_deps": root_module_direct_dev_deps,
+    }
+
+    if supports_facts:
+        # Integrity values are universally true for a given URL, so the
+        # extension stays reproducible as long as they are persisted.
+        metadata_kwargs["facts"] = new_facts
+        metadata_kwargs["reproducible"] = True
+    else:
+        # Without facts, let Bazel record the generated repositories (and
+        # their integrity values) in the lockfile instead of re-downloading.
+        metadata_kwargs["reproducible"] = not from_manifest
+
+    return module_ctx.extension_metadata(**metadata_kwargs)
 
 pkg = module_extension(
-    doc = "A module for defining Julia package dependencies.",
+    doc = """\
+A module extension for defining Julia package dependencies.
+
+```python
+pkg = use_extension("@rules_julia//julia/pkg:extensions.bzl", "pkg")
+pkg.install(
+    name = "my_deps",
+    manifests = ["//:Manifest.toml"],
+)
+use_repo(pkg, "my_deps")
+```
+
+Each package in the manifests becomes a `julia_library` target available as
+`@my_deps//:<PackageName>`. See the `install` tag for how integrity values and
+multiple Julia versions are handled.
+""",
     implementation = _pkg_impl,
     tag_classes = {
         "install": _install_tag,

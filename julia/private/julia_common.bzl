@@ -85,26 +85,54 @@ def _collect_depots(deps):
         transitive = [dep[JuliaInfo].depots for dep in deps if JuliaInfo in dep],
     )
 
+def _collect_artifact_depots(deps):
+    """Collect artifact depots from dependencies.
+
+    Args:
+        deps: List of dependency targets.
+
+    Returns:
+        depset[str]: Runfiles-relative artifact depot directories.
+    """
+    return depset(
+        transitive = [
+            dep[JuliaInfo].artifact_depots
+            for dep in deps
+            if JuliaInfo in dep and hasattr(dep[JuliaInfo], "artifact_depots")
+        ],
+    )
+
 def _version_gte(version, min_version):
     """Check if `version` >= `min_version` (dotted integer strings)."""
     return [int(p) for p in version.split(".")] >= [int(p) for p in min_version.split(".")]
 
-def _package_layout(ctx, srcs):
-    """Determine a target's include path and package entry point.
+def _package_layout(ctx, srcs, data = []):
+    """Determine a target's include paths and package entry point.
 
-    Julia resolves `using Foo` against each `LOAD_PATH` directory by looking
-    for `Foo.jl`. The include path is therefore the directory holding the
-    target's entry point: `src/` for the canonical `src/<name>.jl` layout,
-    otherwise the package directory. Files under `ext/`, `test/` etc. never
-    influence the choice.
+    Julia resolves `using Foo` against each `LOAD_PATH` entry. A directory
+    holding a `Project.toml` is a project environment: Julia identifies the
+    package by the name and UUID recorded there and resolves its dependencies
+    from the `[deps]` table. Packages that rely on their identity (anything
+    using `Preferences`, package extensions, ...) need this. Such targets put
+    the package directory first on `LOAD_PATH`, followed by `src/` when the
+    canonical `src/<name>.jl` layout is used so a mismatch between the target
+    name and the project name still resolves.
+
+    Without a `Project.toml` Julia looks for `Foo.jl` directly in each entry,
+    so the include path is the directory holding the entry point: `src/` for
+    the canonical layout, otherwise the package directory. Files under `ext/`,
+    `test/` etc. never influence the choice.
 
     Args:
         ctx: Rule context.
         srcs: List of source files.
+        data: List of data files; consulted for `Project.toml`.
 
     Returns:
-        struct: `include` (str, relative to the runfiles root) and `entry`
-            (File or None), the `<include>/<name>.jl` source if present.
+        struct: `include` (str, relative to the runfiles root), `includes`
+            (list[str], every `LOAD_PATH` entry this target contributes, most
+            specific first) and `entry` (File or None), the `<name>.jl`
+            source if present.
     """
     workspace_name = ctx.label.workspace_name
     if not workspace_name:
@@ -112,7 +140,7 @@ def _package_layout(ctx, srcs):
 
     pkg_prefix = ctx.label.package + "/" if ctx.label.package else ""
     rel_paths = {}
-    for src in srcs:
+    for src in srcs + data:
         rel_path = src.short_path
         if rel_path.startswith("../"):
             # Strip the `../<repo>/` prefix of external files.
@@ -123,34 +151,50 @@ def _package_layout(ctx, srcs):
 
     path = "{}/{}".format(workspace_name, ctx.label.package).rstrip("/")
 
-    entry = ctx.label.name + ".jl"
-    if "src/" + entry in rel_paths:
-        return struct(include = path + "/src", entry = rel_paths["src/" + entry])
-    if entry in rel_paths:
-        return struct(include = path, entry = rel_paths[entry])
-    for rel_path in rel_paths:
-        if rel_path.startswith("src/"):
-            return struct(include = path + "/src", entry = None)
-    return struct(include = path, entry = None)
+    entry_name = ctx.label.name + ".jl"
+    if "src/" + entry_name in rel_paths:
+        src_layout = True
+        entry = rel_paths["src/" + entry_name]
+    elif entry_name in rel_paths:
+        src_layout = False
+        entry = rel_paths[entry_name]
+    else:
+        entry = None
+        src_layout = False
+        for rel_path in rel_paths:
+            if rel_path.startswith("src/"):
+                src_layout = True
+                break
+
+    has_project = "Project.toml" in rel_paths or "JuliaProject.toml" in rel_paths
+    if has_project:
+        includes = [path] + ([path + "/src"] if src_layout else [])
+    elif src_layout:
+        includes = [path + "/src"]
+    else:
+        includes = [path]
+
+    return struct(include = includes[0], includes = includes, entry = entry)
 
 def _includes_map(include):
     """Map function for formatting include paths."""
     return "    \"{}\",".format(include)
 
-def _create_config_file(ctx, includes, runfiles, depots, name = None):
+def _create_config_file(ctx, includes, runfiles, depots, name = None, artifact_depots = None):
     """Create a configuration file for Julia execution.
 
     The config file contains three sections:
     1. [includes] - Include paths for LOAD_PATH
-    2. [depots] - Depot directories holding build-time precompile caches
+    2. [depots] - Depot directories holding build-time precompile caches and artifacts
     3. [runfiles] - All runfiles paths (excluding toolchain files) for manifest mode
 
     Args:
         ctx: Rule context.
         includes: depset of include paths.
         runfiles: ctx.runfiles object.
-        depots: depset of depot directories.
+        depots: depset of depot directories (Files).
         name: Optional basename for the config file (defaults to the target name).
+        artifact_depots: Optional depset of runfiles-relative artifact depot directories (strings).
 
     Returns:
         File: The config file.
@@ -170,6 +214,8 @@ def _create_config_file(ctx, includes, runfiles, depots, name = None):
     args.add("")
     args.add("depots = [")
     args.add_all(depots, map_each = runfiles_map, allow_closure = True, expand_directories = False)
+    if artifact_depots:
+        args.add_all(artifact_depots, map_each = _includes_map)
     args.add("]")
     args.add("")
     args.add("runfiles = [")
@@ -271,10 +317,10 @@ def _create_julia_binary_impl(
         transitive = [_collect_transitive_srcs(deps)],
     )
 
-    layout = _package_layout(ctx, srcs)
+    layout = _package_layout(ctx, srcs, data_files)
 
     includes = depset(
-        [layout.include],
+        layout.includes,
         transitive = [_collect_includes(deps)],
     )
 
@@ -293,10 +339,12 @@ def _create_julia_binary_impl(
 
     # Dependency depots are already in the dependencies' runfiles. With a
     # custom system image every dependency is in the image and caches built
-    # against the stock image are rejected, so none are listed.
+    # against the stock image are rejected, so none are listed. Artifacts are
+    # always needed: they are located at run time, image or not.
     depots = _collect_depots(deps) if sysimage == None else depset()
+    artifact_depots = _collect_artifact_depots(deps)
 
-    config = _create_config_file(ctx, includes, runfiles, depots)
+    config = _create_config_file(ctx, includes, runfiles, depots, artifact_depots = artifact_depots)
 
     wrapper = _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage)
 
@@ -312,6 +360,7 @@ def _create_julia_binary_impl(
             include = layout.include,
             includes = includes,
             depots = depots,
+            artifact_depots = artifact_depots,
             entry = layout.entry,
             runfiles = runfiles,
         ),
@@ -408,7 +457,7 @@ def _run_driver(
         **kwargs
     )
 
-def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info):
+def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, artifact_depots = None):
     """Precompile a Julia package into a depot directory.
 
     Args:
@@ -418,12 +467,20 @@ def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info):
         runfiles (runfiles): Runfiles of the package and its dependencies.
         dep_depots (depset[File]): Depots of dependencies.
         toolchain_info (ToolchainInfo): The Julia toolchain.
+        artifact_depots (depset[str]): Artifact depots of dependencies.
 
     Returns:
         File: The depot directory containing the package's compile cache.
     """
     depot = ctx.actions.declare_directory("{}.depot".format(name))
-    config = _create_config_file(ctx, includes, runfiles, dep_depots, name = name + ".precompile")
+    config = _create_config_file(
+        ctx,
+        includes,
+        runfiles,
+        dep_depots,
+        name = name + ".precompile",
+        artifact_depots = artifact_depots,
+    )
     manifest = _write_runfiles_manifest(ctx, "{}.precompile_manifest".format(name), runfiles.files)
 
     args = ctx.actions.args()
@@ -472,6 +529,7 @@ julia_common = struct(
     collect_transitive_srcs = _collect_transitive_srcs,
     collect_includes = _collect_includes,
     collect_depots = _collect_depots,
+    collect_artifact_depots = _collect_artifact_depots,
     package_layout = _package_layout,
     precompile = _precompile,
     run_driver = _run_driver,
