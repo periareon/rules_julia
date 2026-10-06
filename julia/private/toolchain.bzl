@@ -26,6 +26,7 @@ def _julia_toolchain_impl(ctx):
             all_files = all_files,
             sysimage = ctx.file.sysimage,
             link_files = depset(ctx.files.link_files),
+            linker = ctx.attr.linker,
             cpu_target = ctx.attr.cpu_target,
             version = ctx.attr.version,
         ),
@@ -52,6 +53,15 @@ julia_toolchain = rule(
         "link_files": attr.label_list(
             doc = "The `libjulia` libraries needed to link a system image.",
             allow_files = True,
+        ),
+        "linker": attr.string(
+            doc = (
+                "The linker used for system images built with this toolchain unless " +
+                "overridden by `--@rules_julia//julia/settings:linker`. `julia` uses the " +
+                "`lld` bundled with Julia; `cc` uses the C++ toolchain."
+            ),
+            values = ["julia", "cc"],
+            default = "julia",
         ),
         "sysimage": attr.label(
             doc = "The stock system image (`sys.so`, `sys.dylib` or `sys.dll`).",

@@ -1,5 +1,6 @@
 """Julia standalone binary rules"""
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load(":julia_common.bzl", "julia_common")
@@ -78,8 +79,12 @@ def _emit_sysimage_object(ctx, *, julia_info, toolchain_info):
 
     return archive
 
+_CC_TOOLCHAIN_TYPE = "@rules_cc//cc:toolchain_type"
+
 def _link_sysimage(ctx, *, archive, toolchain_info):
-    """Link a system image object archive into a shared library using the C++ toolchain.
+    """Link a system image object archive into a shared library.
+
+    The linker is the toolchain's unless `//julia/settings:linker` overrides it.
 
     Args:
         ctx: Rule context.
@@ -89,6 +94,47 @@ def _link_sysimage(ctx, *, archive, toolchain_info):
     Returns:
         File: The shared library (the system image).
     """
+    linker = ctx.attr._linker[BuildSettingInfo].value
+    if linker == "toolchain":
+        linker = toolchain_info.linker
+    if linker == "julia":
+        return _link_with_julia(ctx, archive = archive, toolchain_info = toolchain_info)
+    if linker == "cc":
+        return _link_with_cc(ctx, archive = archive, toolchain_info = toolchain_info)
+    fail("Unknown linker `{}`".format(linker))
+
+def _link_with_julia(ctx, *, archive, toolchain_info):
+    """Link with the `lld` bundled with Julia, as Julia links its own package images."""
+    sysimage = ctx.actions.declare_file("{}.sysimage/sys.{}".format(
+        ctx.label.name,
+        toolchain_info.sysimage.extension,
+    ))
+
+    args = ctx.actions.args()
+    args.add("--archive", archive)
+    args.add("--output", sysimage)
+
+    julia_common.run_driver(
+        ctx,
+        toolchain_info = toolchain_info,
+        driver = ctx.file._link_driver,
+        arguments = args,
+        inputs = depset([archive]),
+        outputs = [sysimage],
+        mnemonic = "JuliaLink",
+    )
+
+    return sysimage
+
+def _link_with_cc(ctx, *, archive, toolchain_info):
+    """Link with `cc_common.link` and the resolved C++ toolchain."""
+    if not ctx.toolchains[_CC_TOOLCHAIN_TYPE]:
+        fail((
+            "{}: `--@rules_julia//julia/settings:linker=cc` requires a C++ toolchain " +
+            "but none resolved for the target platform. Register one or use the " +
+            "linker bundled with Julia (`linker=julia`)."
+        ).format(ctx.label))
+
     cc_toolchain = find_cc_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
@@ -167,10 +213,13 @@ Build a Julia package and its dependencies into a custom system image and
 produce an executable that starts Julia with it.
 
 The system image is produced in two actions: `julia --output-o` emits the
-object archive of the image, which the C++ toolchain links into a shared
-library. The executable is the regular Julia wrapper started with
-`--sysimage`, so all code is loaded precompiled and startup is immediate.
-No network access or host tools outside the Bazel toolchains are involved.
+object archive of the image, which is then linked into a shared library.
+By default the link uses the `lld` bundled with Julia, the same way Julia
+links its own package images; `--@rules_julia//julia/settings:linker=cc`
+selects the C++ toolchain instead. The executable is the regular Julia
+wrapper started with `--sysimage`, so all code is loaded precompiled and
+startup is immediate. No network access or host tools outside the Bazel
+toolchains are involved.
 
 The target in `binary` must be a Julia package: its entry point is
 `src/<name>.jl` defining `module <name>` with a `julia_main()::Cint` function,
@@ -211,6 +260,13 @@ julia_standalone_binary(
             ),
             allow_files = True,
         ),
+        "_link_driver": attr.label(
+            default = Label("//julia/private:link.jl"),
+            allow_single_file = True,
+        ),
+        "_linker": attr.label(
+            default = Label("//julia/settings:linker"),
+        ),
         "_sysimage_driver": attr.label(
             default = Label("//julia/private:sysimage.jl"),
             allow_single_file = True,
@@ -219,7 +275,8 @@ julia_standalone_binary(
     executable = True,
     toolchains = [
         TOOLCHAIN_TYPE,
-        "@rules_cc//cc:toolchain_type",
+        # Only used (and only required) when `//julia/settings:linker=cc`.
+        config_common.toolchain_type(_CC_TOOLCHAIN_TYPE, mandatory = False),
     ],
     fragments = ["cpp"],
 )

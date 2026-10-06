@@ -12,6 +12,15 @@ load("//julia/private:versions.bzl", "JULIA_DEFAULT_VERSION")
 _toolchain_tag = tag_class(
     doc = "Request that a Julia version be made available via `@julia_toolchains`.",
     attrs = {
+        "linker": attr.string(
+            doc = (
+                "The default linker for system images built with this version: `julia` " +
+                "(the `lld` bundled with Julia) or `cc` (the C++ toolchain). Can be " +
+                "overridden with `--@rules_julia//julia/settings:linker`."
+            ),
+            values = ["julia", "cc"],
+            default = "julia",
+        ),
         "version": attr.string(
             doc = "A Julia version (e.g. `1.12.5`). Select it with `--@rules_julia//julia/settings:version`.",
             mandatory = True,
@@ -23,9 +32,10 @@ def _julia_impl(module_ctx):
     reproducible = True
 
     # The default version is always registered. Additional versions are only
-    # registered when requested so toolchain resolution stays cheap.
-    versions = {JULIA_DEFAULT_VERSION: None}
-    for mod in module_ctx.modules:
+    # registered when requested so toolchain resolution stays cheap. The root
+    # module is processed first so its choice of linker for a version wins.
+    versions = {}
+    for mod in sorted(module_ctx.modules, key = lambda mod: 0 if mod.is_root else 1):
         for tag in mod.tags.toolchain:
             if tag.version not in JULIA_VERSIONS:
                 fail("Module `{}` requested unknown Julia version `{}`. Known versions: {}".format(
@@ -33,14 +43,15 @@ def _julia_impl(module_ctx):
                     tag.version,
                     ", ".join(JULIA_VERSIONS.keys()),
                 ))
-            versions[tag.version] = None
+            versions.setdefault(tag.version, tag.linker)
+    versions.setdefault(JULIA_DEFAULT_VERSION, "julia")
 
     toolchain_names = []
     toolchain_labels = {}
     target_settings = {}
     exec_compatible_with = {}
     target_compatible_with = {}
-    for version in versions:
+    for version, linker in versions.items():
         for triplet, info in JULIA_VERSIONS[version].items():
             tool_name = julia_toolchain_repository(
                 name = "julia_{}_{}".format(version, triplet.replace("-", "_")),
@@ -48,6 +59,7 @@ def _julia_impl(module_ctx):
                 triplet = triplet,
                 url = info["url"],
                 integrity = info["integrity"],
+                linker = linker,
             )
 
             toolchain_names.append(tool_name)

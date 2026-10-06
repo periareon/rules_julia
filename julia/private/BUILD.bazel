@@ -6,6 +6,7 @@ exports_files([
     "binary_wrapper.sh.tpl",
     "binary_wrapper_maker.jl",
     "entrypoint.jl",
+    "link.jl",
     "precompile.jl",
     "rules_julia_common.jl",
     "sysimage.jl",
