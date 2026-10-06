@@ -255,10 +255,13 @@ julia_standalone_binary(<a href="rules.html#julia_standalone_binary-name">name</
 <p>Build a Julia package and its dependencies into a custom system image and
 produce an executable that starts Julia with it.</p>
 <p>The system image is produced in two actions: <code>julia --output-o</code> emits the
-object archive of the image, which the C++ toolchain links into a shared
-library. The executable is the regular Julia wrapper started with
-<code>--sysimage</code>, so all code is loaded precompiled and startup is immediate.
-No network access or host tools outside the Bazel toolchains are involved.</p>
+object archive of the image, which is then linked into a shared library.
+By default the link uses the <code>lld</code> bundled with Julia, the same way Julia
+links its own package images; <code>--@rules_julia//julia/settings:linker=cc</code>
+selects the C++ toolchain instead. The executable is the regular Julia
+wrapper started with <code>--sysimage</code>, so all code is loaded precompiled and
+startup is immediate. No network access or host tools outside the Bazel
+toolchains are involved.</p>
 <p>The target in <code>binary</code> must be a Julia package: its entry point is
 <code>src/&lt;name&gt;.jl</code> defining <code>module &lt;name&gt;</code> with a <code>julia_main()::Cint</code> function,
 which is called with the command line arguments in <code>ARGS</code>.</p>
@@ -305,7 +308,7 @@ julia_test(<a href="rules.html#julia_test-name">name</a>, <a href="rules.html#ju
 <pre>
 load("@rules_julia//julia:defs.bzl", "julia_toolchain")
 
-julia_toolchain(<a href="rules.html#julia_toolchain-name">name</a>, <a href="rules.html#julia_toolchain-cpu_target">cpu_target</a>, <a href="rules.html#julia_toolchain-julia">julia</a>, <a href="rules.html#julia_toolchain-link_files">link_files</a>, <a href="rules.html#julia_toolchain-sysimage">sysimage</a>, <a href="rules.html#julia_toolchain-version">version</a>)
+julia_toolchain(<a href="rules.html#julia_toolchain-name">name</a>, <a href="rules.html#julia_toolchain-cpu_target">cpu_target</a>, <a href="rules.html#julia_toolchain-julia">julia</a>, <a href="rules.html#julia_toolchain-link_files">link_files</a>, <a href="rules.html#julia_toolchain-linker">linker</a>, <a href="rules.html#julia_toolchain-sysimage">sysimage</a>, <a href="rules.html#julia_toolchain-version">version</a>)
 </pre>
 <p>A toolchain for building Julia targets.</p>
 <p><strong>ATTRIBUTES</strong></p>
@@ -314,6 +317,7 @@ julia_toolchain(<a href="rules.html#julia_toolchain-name">name</a>, <a href="rul
 <tr><td style="text-align: left"><a id="julia_toolchain-cpu_target"></a>cpu_target</td><td style="text-align: left">The default <code>--cpu-target</code> for system images built with this toolchain. Should be portable across machines of the toolchain's architecture.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"generic"</code></td></tr>
 <tr><td style="text-align: left"><a id="julia_toolchain-julia"></a>julia</td><td style="text-align: left">The path to the Julia binary (julia or julia.exe).</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 <tr><td style="text-align: left"><a id="julia_toolchain-link_files"></a>link_files</td><td style="text-align: left">The <code>libjulia</code> libraries needed to link a system image.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_toolchain-linker"></a>linker</td><td style="text-align: left">The linker used for system images built with this toolchain unless overridden by <code>--@rules_julia//julia/settings:linker</code>. <code>julia</code> uses the <code>lld</code> bundled with Julia; <code>cc</code> uses the C++ toolchain.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"julia"</code></td></tr>
 <tr><td style="text-align: left"><a id="julia_toolchain-sysimage"></a>sysimage</td><td style="text-align: left">The stock system image (<code>sys.so</code>, <code>sys.dylib</code> or <code>sys.dll</code>).</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
 <tr><td style="text-align: left"><a id="julia_toolchain-version"></a>version</td><td style="text-align: left">The Julia version string (e.g., '1.12.5').</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 </tbody></table>
@@ -332,7 +336,7 @@ julia_format_aspect()
 <h2 id="julia"><a class="header" href="#julia">julia</a></h2>
 <pre>
 julia = use_extension("@rules_julia//julia:defs.bzl", "julia")
-julia.toolchain(<a href="rules.html#julia.toolchain-version">version</a>)
+julia.toolchain(<a href="rules.html#julia.toolchain-linker">linker</a>, <a href="rules.html#julia.toolchain-version">version</a>)
 </pre>
 <p>Bzlmod extensions for Julia</p>
 <p><strong>TAG CLASSES</strong></p>
@@ -341,6 +345,7 @@ julia.toolchain(<a href="rules.html#julia.toolchain-version">version</a>)
 <p>Request that a Julia version be made available via <code>@julia_toolchains</code>.</p>
 <p><strong>Attributes</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia.toolchain-linker"></a>linker</td><td style="text-align: left">The default linker for system images built with this version: <code>julia</code> (the <code>lld</code> bundled with Julia) or <code>cc</code> (the C++ toolchain). Can be overridden with <code>--@rules_julia//julia/settings:linker</code>.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"julia"</code></td></tr>
 <tr><td style="text-align: left"><a id="julia.toolchain-version"></a>version</td><td style="text-align: left">A Julia version (e.g. <code>1.12.5</code>). Select it with <code>--@rules_julia//julia/settings:version</code>.</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><!-- Generated with Stardoc: http://skydoc.bazel.build -->
@@ -355,6 +360,27 @@ julia.toolchain(<a href="rules.html#julia.toolchain-version">version</a>)
 <p><strong>PARAMETERS</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a id="formatter_config-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"formatter_config"</code></td></tr>
+</tbody></table>
+</div>
+<p><a id="linker"></a></p>
+<h2 id="linker"><a class="header" href="#linker">linker</a></h2>
+<pre>
+--@rules_julia//julia/settings:linker
+</pre>
+<p>The linker used to turn a system image object archive into a shared library.</p>
+<ul>
+<li><code>toolchain</code> (default): whatever the resolved Julia toolchain's <code>linker</code> attribute
+says (<code>julia</code> for toolchains registered by the <code>julia</code> extension unless a
+<code>julia.toolchain(linker = ...)</code> tag says otherwise).</li>
+<li><code>julia</code>: the <code>lld</code> bundled with Julia, invoked through <code>Base.Linking</code> exactly as
+Julia links its own package images. Works on every platform Julia ships for and
+needs no C++ toolchain.</li>
+<li><code>cc</code>: <code>cc_common.link</code> with the resolved C++ toolchain. Requires a GNU-compatible
+toolchain; fails if no C++ toolchain resolves.</li>
+</ul>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="linker-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"linker"</code></td></tr>
 </tbody></table>
 </div>
 <p><a id="version"></a></p>

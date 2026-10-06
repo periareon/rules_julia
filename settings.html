@@ -169,6 +169,27 @@
 <tr><td style="text-align: left"><a id="formatter_config-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"formatter_config"</code></td></tr>
 </tbody></table>
 </div>
+<p><a id="linker"></a></p>
+<h2 id="linker"><a class="header" href="#linker">linker</a></h2>
+<pre>
+--@rules_julia//julia/settings:linker
+</pre>
+<p>The linker used to turn a system image object archive into a shared library.</p>
+<ul>
+<li><code>toolchain</code> (default): whatever the resolved Julia toolchain's <code>linker</code> attribute
+says (<code>julia</code> for toolchains registered by the <code>julia</code> extension unless a
+<code>julia.toolchain(linker = ...)</code> tag says otherwise).</li>
+<li><code>julia</code>: the <code>lld</code> bundled with Julia, invoked through <code>Base.Linking</code> exactly as
+Julia links its own package images. Works on every platform Julia ships for and
+needs no C++ toolchain.</li>
+<li><code>cc</code>: <code>cc_common.link</code> with the resolved C++ toolchain. Requires a GNU-compatible
+toolchain; fails if no C++ toolchain resolves.</li>
+</ul>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="linker-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"linker"</code></td></tr>
+</tbody></table>
+</div>
 <p><a id="version"></a></p>
 <h2 id="version"><a class="header" href="#version">version</a></h2>
 <pre>
