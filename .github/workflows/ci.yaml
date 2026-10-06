@@ -92,6 +92,33 @@ jobs:
         run: bazel $env:BAZEL_STARTUP_FLAGS test //... --//julia/settings:version=${{ env.JULIA_MIN_VERSION }}
         if: startswith(runner.os, 'Windows')
 
+  # The system image linker defaults to the lld bundled with Julia. Also
+  # exercise `cc_common.link` with the C++ toolchain. Windows is excluded: the
+  # `cc` linker needs a GNU-compatible toolchain and the runners provide MSVC.
+  ci-cc-linker:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+          - os: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Setup Bazelrc
+        run: |
+          echo "common --keep_going" >> ./user.bazelrc
+
+      - name: Test
+        run: bazel ${BAZEL_STARTUP_FLAGS[@]} test //julia/private/tests/standalone_bin/... //julia/private/tests/standalone_bin_with_lib/... --//julia/settings:linker=cc
+
   ci-format:
     runs-on: ubuntu-24.04
     steps:

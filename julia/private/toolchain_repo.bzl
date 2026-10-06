@@ -93,6 +93,7 @@ julia_toolchain(
     cpu_target = "{cpu_target}",
     julia = ":julia_bin",
     link_files = [":link_files"],
+    linker = "{linker}",
     sysimage = ":sysimage",
     version = "{version}",
     visibility = ["//visibility:public"],
@@ -105,7 +106,7 @@ alias(
 )
 """
 
-def julia_toolchain_repository(*, name, version, triplet, url, integrity):
+def julia_toolchain_repository(*, name, version, triplet, url, integrity, linker = "julia"):
     """Download a version of Julia and instantiate targets for it.
 
     Args:
@@ -114,6 +115,7 @@ def julia_toolchain_repository(*, name, version, triplet, url, integrity):
         triplet (str): The target platform triplet (e.g., "x86_64-linux-gnu").
         url (str): The URL to fetch Julia from.
         integrity (str): The integrity checksum of the Julia archive.
+        linker (str): The default system image linker (`julia` or `cc`).
 
     Returns:
         str: Return `name` for convenience.
@@ -135,6 +137,7 @@ def julia_toolchain_repository(*, name, version, triplet, url, integrity):
         strip_prefix = strip_prefix,
         build_file_content = _JULIA_TOOLCHAIN_BUILD_FILE_CONTENT.format(
             cpu_target = _CPU_TARGETS.get(triplet.split("-")[0], "generic"),
+            linker = linker,
             name = name,
             julia_bin = julia_bin,
             version = version,
