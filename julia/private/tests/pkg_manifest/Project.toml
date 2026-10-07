@@ -1,0 +1,7 @@
+name = "pkg_manifest"
+version = "0.0.1"
+
+[deps]
+Bzip2_jll = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
+Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
+JLLWrappers = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"

@@ -1,0 +1,52 @@
+"""Tests for `pkg.install(manifests = ...)`.
+
+The `rules_julia_test_pkg` hub is defined in `MODULE.bazel` from the
+manifests alone; no `Manifest.bazel.json` exists for it.
+"""
+
+load("//julia:julia_test.bzl", "julia_test")
+load("//julia/pkg:julia_pkg_compiler.bzl", "julia_pkg_compiler")
+load("//julia/pkg:julia_pkg_test.bzl", "julia_pkg_test")
+
+exports_files([
+    "Project.toml",
+    "Manifest-v1.10.toml",
+    "Manifest-v1.12.toml",
+])
+
+# One manifest per supported Julia minor version; each is resolved and
+# verified with a toolchain of that version.
+julia_pkg_compiler(
+    name = "pkg_update",
+    manifests = {
+        "Manifest-v1.10.toml": "1.10",
+        "Manifest-v1.12.toml": "1.12",
+    },
+    project_toml = "Project.toml",
+)
+
+julia_pkg_test(
+    name = "pkg_test",
+    compiler = ":pkg_update",
+)
+
+julia_test(
+    name = "glob_test",
+    srcs = ["glob_test.jl"],
+    deps = ["@rules_julia_test_pkg//:Glob"],
+)
+
+julia_test(
+    name = "identity_test",
+    srcs = ["identity_test.jl"],
+    deps = [
+        "@rules_julia_test_pkg//:Glob",
+        "@rules_julia_test_pkg//:JLLWrappers",
+    ],
+)
+
+julia_test(
+    name = "artifact_test",
+    srcs = ["artifact_test.jl"],
+    deps = ["@rules_julia_test_pkg//:Bzip2_jll"],
+)

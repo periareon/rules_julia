@@ -4,6 +4,12 @@ Template renderer for julia_binary_wrapper.
 Reads a shell/batch template, splices runfiles library contents at marker
 lines (file substitutions), applies string substitutions, and writes the
 result. Invoked as a Bazel action by julia_binary_wrapper.
+
+Line endings are normalized for the output type: batch files (`.bat`) are
+written with CRLF, since cmd.exe resolves `call :label` unreliably in files
+with LF endings, and everything else is written with LF. This keeps the
+result consistent regardless of how the template or the spliced runfiles
+library were checked out.
 """
 
 function parse_args(args)
@@ -38,6 +44,20 @@ function parse_args(args)
     return output, template, substitutions, file_substitutions
 end
 
+"""
+    normalize_line_endings(text, output)
+
+Return `text` with CRLF line endings if `output` is a batch file and LF
+line endings otherwise.
+"""
+function normalize_line_endings(text::AbstractString, output::AbstractString)
+    text = replace(text, "\r\n" => "\n")
+    if endswith(lowercase(output), ".bat")
+        text = replace(text, "\n" => "\r\n")
+    end
+    return text
+end
+
 function main()
     output, template_path, substitutions, file_substitutions = parse_args(ARGS)
 
@@ -52,7 +72,7 @@ function main()
         text = replace(text, old => new)
     end
 
-    write(output, text)
+    write(output, normalize_line_endings(text, output))
 end
 
 main()

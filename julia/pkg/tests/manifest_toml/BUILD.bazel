@@ -1,0 +1,9 @@
+load(":artifacts_test.bzl", "artifacts_test_suite")
+load(":julia_version_test.bzl", "julia_version_test_suite")
+load(":manifest_toml_test.bzl", "manifest_toml_test_suite")
+
+manifest_toml_test_suite(name = "manifest_toml_test_suite")
+
+artifacts_test_suite(name = "artifacts_test_suite")
+
+julia_version_test_suite(name = "julia_version_test_suite")

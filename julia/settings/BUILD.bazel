@@ -1,7 +1,10 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(
     ":settings.bzl",
+    "cxxstring_abi",
     "formatter_config",
+    "libc",
+    "libgfortran_version",
     "linker",
     "version",
 )
@@ -13,6 +16,7 @@ bzl_library(
     srcs = glob(["*.bzl"]),
     visibility = ["//julia/private:__pkg__"],
     deps = [
+        "@bazel_skylib//lib:selects",
         "@bazel_skylib//rules:common_settings",
     ],
 )
@@ -22,3 +26,9 @@ formatter_config()
 linker()
 
 version()
+
+libc()
+
+libgfortran_version()
+
+cxxstring_abi()

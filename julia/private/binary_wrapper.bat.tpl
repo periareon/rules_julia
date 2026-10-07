@@ -16,8 +16,6 @@ if "%RUNFILES_DIR%"=="" if "%RUNFILES_MANIFEST_FILE%"=="" (
     )
 )
 
-@REM {RUNFILES_API}
-
 call :runfiles_export_envvars
 
 call :rlocation "{interpreter}" INTERPRETER
@@ -80,3 +78,9 @@ if not "%SYSIMAGE%"=="" (
     "%MAIN%" ^
     -- ^
     %*
+exit /b %ERRORLEVEL%
+
+@REM The runfiles library (`runfiles.bat` from rules_batch) is appended below
+@REM at build time. Nothing may run past the `exit /b` above: `:rlocation`
+@REM and `:runfiles_export_envvars` are only ever reached via `call`.
+@REM {RUNFILES_API}

@@ -4,7 +4,7 @@ load("//julia/pkg:julia_pkg_test.bzl", "julia_pkg_test")
 julia_pkg_compiler(
     name = "pkg_update",
     manifest_bazel_json = "//julia/private/format:Manifest.bazel.json",
-    manifest_toml = "//julia/private/format:Manifest.toml",
+    manifests = {"//julia/private/format:Manifest.toml": "1.12"},
     project_toml = "//julia/private/format:Project.toml",
 )
 

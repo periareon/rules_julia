@@ -1,7 +1,17 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
-load("//julia:julia_binary.bzl", "julia_binary")
+load(":julia_runtime.bzl", "julia_runtime")
 
-exports_files(["pkg_tester.jl"])
+exports_files([
+    "pkg_compiler.jl",
+    "pkg_compiler_driver.jl",
+    "pkg_tester.jl",
+    "pkg_tester_core.jl",
+])
+
+julia_runtime(
+    name = "julia_runtime",
+    visibility = ["//visibility:public"],
+)
 
 bzl_library(
     name = "bazel_tools_bzl_lib",
@@ -12,18 +22,8 @@ bzl_library(
     name = "bzl_lib",
     srcs = glob(["*.bzl"]),
     visibility = ["//julia/pkg:__pkg__"],
-    deps = [":bazel_tools_bzl_lib"],
-)
-
-julia_binary(
-    name = "pkg_compiler",
-    srcs = ["pkg_compiler.jl"],
-    visibility = ["//visibility:public"],
-)
-
-julia_binary(
-    name = "pkg_tester",
-    srcs = ["pkg_tester.jl"],
-    visibility = ["//visibility:public"],
-    deps = ["//julia/runfiles"],
+    deps = [
+        ":bazel_tools_bzl_lib",
+        "@toml.bzl//:toml",
+    ],
 )

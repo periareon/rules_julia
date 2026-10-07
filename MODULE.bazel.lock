@@ -19,8 +19,8 @@
     "https://bcr.bazel.build/modules/apple_support/1.21.0/MODULE.bazel": "ac1824ed5edf17dee2fdd4927ada30c9f8c3b520be1b5fd02a5da15bc10bff3e",
     "https://bcr.bazel.build/modules/apple_support/1.21.1/MODULE.bazel": "5809fa3efab15d1f3c3c635af6974044bac8a4919c62238cce06acee8a8c11f1",
     "https://bcr.bazel.build/modules/apple_support/1.24.1/MODULE.bazel": "f46e8ddad60aef170ee92b2f3d00ef66c147ceafea68b6877cb45bd91737f5f8",
-    "https://bcr.bazel.build/modules/apple_support/1.24.2/MODULE.bazel": "0e62471818affb9f0b26f128831d5c40b074d32e6dda5a0d3852847215a41ca4",
-    "https://bcr.bazel.build/modules/apple_support/1.24.2/source.json": "2c22c9827093250406c5568da6c54e6fdf0ef06238def3d99c71b12feb057a8d",
+    "https://bcr.bazel.build/modules/apple_support/2.5.2/MODULE.bazel": "bb1b7081e390a8d3885f642cb0073dfcf8e7a36525e079fa8f5835af7079c0fe",
+    "https://bcr.bazel.build/modules/apple_support/2.5.2/source.json": "dd51ee925a550e92b55eb41c4c809a967da311a2d2520241252a238a48b39c4c",
     "https://bcr.bazel.build/modules/bazel_features/1.1.1/MODULE.bazel": "27b8c79ef57efe08efccbd9dd6ef70d61b4798320b8d3c134fd571f78963dbcd",
     "https://bcr.bazel.build/modules/bazel_features/1.10.0/MODULE.bazel": "f75e8807570484a99be90abcd52b5e1f390362c258bcb73106f4544957a48101",
     "https://bcr.bazel.build/modules/bazel_features/1.11.0/MODULE.bazel": "f9382337dd5a474c3b7d334c2f83e50b6eaedc284253334cf823044a26de03e8",
@@ -70,6 +70,8 @@
     "https://bcr.bazel.build/modules/libpfm/4.11.0/MODULE.bazel": "45061ff025b301940f1e30d2c16bea596c25b176c8b6b3087e92615adbd52902",
     "https://bcr.bazel.build/modules/nlohmann_json/3.6.1/MODULE.bazel": "6f7b417dcc794d9add9e556673ad25cb3ba835224290f4f848f8e2db1e1fca74",
     "https://bcr.bazel.build/modules/nlohmann_json/3.6.1/source.json": "f448c6e8963fdfa7eb831457df83ad63d3d6355018f6574fb017e8169deb43a9",
+    "https://bcr.bazel.build/modules/package_metadata/0.0.7/MODULE.bazel": "7adb03933fc8401f495800cf4eafcff0edc6da0ff55c7db223ef69d19f689486",
+    "https://bcr.bazel.build/modules/package_metadata/0.0.7/source.json": "50639625e937b56115012674c797cca7a05a96b4878c87d803c13dc2b31de8a0",
     "https://bcr.bazel.build/modules/platforms/0.0.10/MODULE.bazel": "8cb8efaf200bdeb2150d93e162c40f388529a25852b332cec879373771e48ed5",
     "https://bcr.bazel.build/modules/platforms/0.0.11/MODULE.bazel": "0daefc49732e227caa8bfa834d65dc52e8cc18a2faf80df25e8caea151a9413f",
     "https://bcr.bazel.build/modules/platforms/0.0.4/MODULE.bazel": "9b328e31ee156f53f3c416a64f8491f7eb731742655a47c9eec4703a71644aee",
@@ -102,8 +104,8 @@
     "https://bcr.bazel.build/modules/rules_apple/3.16.0/MODULE.bazel": "0d1caf0b8375942ce98ea944be754a18874041e4e0459401d925577624d3a54a",
     "https://bcr.bazel.build/modules/rules_apple/4.1.0/MODULE.bazel": "76e10fd4a48038d3fc7c5dc6e63b7063bbf5304a2e3bd42edda6ec660eebea68",
     "https://bcr.bazel.build/modules/rules_apple/4.1.0/source.json": "8ee81e1708756f81b343a5eb2b2f0b953f1d25c4ab3d4a68dc02754872e80715",
-    "https://bcr.bazel.build/modules/rules_batch/0.0.1/MODULE.bazel": "fd2b1ebe02a96f2ef3dea0b375b6f442db548e532fbd31e6c388e67239d83b76",
-    "https://bcr.bazel.build/modules/rules_batch/0.0.1/source.json": "74b403aa702f5c4398f375a883360f560d514160a7e3bb909c1845b2ad452a40",
+    "https://bcr.bazel.build/modules/rules_batch/0.1.1/MODULE.bazel": "d86a3773a3aed23878baaf7263917ea7dd71d2100934e989d2f303246389fdcb",
+    "https://bcr.bazel.build/modules/rules_batch/0.1.1/source.json": "7280584357144d887d386f436ea0e8f9629a68d6396458f65f5fb4e49d8a185d",
     "https://bcr.bazel.build/modules/rules_cc/0.0.1/MODULE.bazel": "cb2aa0747f84c6c3a78dad4e2049c154f08ab9d166b1273835a8174940365647",
     "https://bcr.bazel.build/modules/rules_cc/0.0.10/MODULE.bazel": "ec1705118f7eaedd6e118508d3d26deba2a4e76476ada7e0e3965211be012002",
     "https://bcr.bazel.build/modules/rules_cc/0.0.13/MODULE.bazel": "0e8529ed7b323dad0775ff924d2ae5af7640b23553dfcd4d34344c7e7a867191",
@@ -119,6 +121,7 @@
     "https://bcr.bazel.build/modules/rules_cc/0.1.5/MODULE.bazel": "88dfc9361e8b5ae1008ac38f7cdfd45ad738e4fa676a3ad67d19204f045a1fd8",
     "https://bcr.bazel.build/modules/rules_cc/0.2.0/MODULE.bazel": "b5c17f90458caae90d2ccd114c81970062946f49f355610ed89bebf954f5783c",
     "https://bcr.bazel.build/modules/rules_cc/0.2.13/MODULE.bazel": "eecdd666eda6be16a8d9dc15e44b5c75133405e820f620a234acc4b1fdc5aa37",
+    "https://bcr.bazel.build/modules/rules_cc/0.2.15/MODULE.bazel": "6a0a4a75a57aa6dc888300d848053a58c6b12a29f89d4304e1c41448514ec6e8",
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "1849602c86cb60da8613d2de887f9566a6d354a6df6d7009f9d04a14402f9a84",
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json": "3832f45d145354049137c0090df04629d9c2b5493dc5c2bf46f1834040133a07",
     "https://bcr.bazel.build/modules/rules_cc/0.2.4/MODULE.bazel": "1ff1223dfd24f3ecf8f028446d4a27608aa43c3f41e346d22838a4223980b8cc",
@@ -194,6 +197,8 @@
     "https://bcr.bazel.build/modules/swift_argument_parser/1.3.1.1/MODULE.bazel": "5e463fbfba7b1701d957555ed45097d7f984211330106ccd1352c6e0af0dcf91",
     "https://bcr.bazel.build/modules/swift_argument_parser/1.3.1.2/MODULE.bazel": "75aab2373a4bbe2a1260b9bf2a1ebbdbf872d3bd36f80bff058dccd82e89422f",
     "https://bcr.bazel.build/modules/swift_argument_parser/1.3.1.2/source.json": "5fba48bbe0ba48761f9e9f75f92876cafb5d07c0ce059cc7a8027416de94a05b",
+    "https://bcr.bazel.build/modules/toml.bzl/0.5.0/MODULE.bazel": "29c04b37a3f50c8dfcdc0c742eec7561ecb3d0cfea353bdb445ad8f6e0c81370",
+    "https://bcr.bazel.build/modules/toml.bzl/0.5.0/source.json": "a80e38d7d03cee9de004f49f0b817943332fc357ec0ca9b123a334ac6e9722ca",
     "https://bcr.bazel.build/modules/upb/0.0.0-20220923-a547704/MODULE.bazel": "7298990c00040a0e2f121f6c32544bab27d4452f80d9ce51349b1a28f3005c43",
     "https://bcr.bazel.build/modules/zlib/1.2.11/MODULE.bazel": "07b389abc85fdbca459b69e2ec656ae5622873af3f845e1c9d80fe179f3effa0",
     "https://bcr.bazel.build/modules/zlib/1.3.1.bcr.5/MODULE.bazel": "eec517b5bbe5492629466e11dae908d043364302283de25581e3eb944326c4ca",
@@ -226,7 +231,7 @@
     },
     "@@rules_kotlin+//src/main/starlark/core/repositories:bzlmod_setup.bzl%rules_kotlin_extensions": {
       "general": {
-        "bzlTransitiveDigest": "+Kp6j204mBZ3mxlIDDR0gBoP45BZ4jYRhRAcB8sU0qc=",
+        "bzlTransitiveDigest": "WDuVCwqV73DvcHB5Of+02lhUZgPxr9MqtpvMRyUi0eQ=",
         "usagesDigest": "QI2z8ZUR+mqtbwsf2fLqYdJAkPOHdOV+tF2yVAUgRzw=",
         "recordedInputs": [
           "REPO_MAPPING:rules_kotlin+,bazel_tools bazel_tools"
@@ -283,7 +288,7 @@
     },
     "@@rules_python+//python/extensions:config.bzl%config": {
       "general": {
-        "bzlTransitiveDigest": "dzD8Q2YmrP3fz8saWLHPmlwPLO91ImtTmP/c9JKTStM=",
+        "bzlTransitiveDigest": "L+2ZCpb7GIJqvWaXpzkfk/80d916sIFVmSPzrSm6of8=",
         "usagesDigest": "ZVSXMAGpD+xzVNPuvF1IoLBkty7TROO0+akMapt1pAg=",
         "recordedInputs": [
           "REPO_MAPPING:rules_python+,bazel_tools bazel_tools",
@@ -451,7 +456,7 @@
     },
     "@@rules_python+//python/uv:uv.bzl%uv": {
       "general": {
-        "bzlTransitiveDigest": "ijW9KS7qsIY+yBVvJ+Nr1mzwQox09j13DnE3iIwaeTM=",
+        "bzlTransitiveDigest": "IgkgxNrtlAec7OnaFrWoCC5NQhHcY/aIz4jsqcNMm8Y=",
         "usagesDigest": "H8dQoNZcoqP+Mu0tHZTi4KHATzvNkM5ePuEqoQdklIU=",
         "recordedInputs": [
           "REPO_MAPPING:rules_python+,bazel_tools bazel_tools",
@@ -579,6 +584,260 @@
       }
     }
   },
-  "facts": {},
+  "facts": {
+    "//julia/pkg:extensions.bzl%pkg": {
+      "https://pkg.julialang.org/package/21216c6a-2e73-6563-6e65-726566657250/5005266de4bfe50e53ff44a5cb5c540b6e47a254": {
+        "artifacts": {},
+        "integrity": "sha256-ntrdKh+HtZJiUBbdCp7oO9GBzvwQ6puTOk0fMjEaYeQ="
+      },
+      "https://pkg.julialang.org/package/692b3bcd-3c85-4b1f-b108-f13ce0eb3210/7204148362dafe5fe6a273f855b8ccbe4df8173e": {
+        "artifacts": {},
+        "integrity": "sha256-0q+c252bZMLBvpYBKqw0zcnh241l5SMx6z0KYFEGF84="
+      },
+      "https://pkg.julialang.org/package/6e34b625-4abd-537c-b88f-471c36dfa7a0/1b96ea4a01afe0ea4090c5c8039690672dd13f2e": {
+        "artifacts": {
+          "Bzip2": [
+            {
+              "lazy": false,
+              "sha256": "b172414de3958fd16cf61839471529d76b74ac486f2955283a5a063665ff560d",
+              "tags": {
+                "arch": "aarch64",
+                "os": "macos"
+              },
+              "tree_hash": "c1600fa286afe4bf3616780a19b65285c63968ca",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.aarch64-apple-darwin.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "3bddaf572b7146720d3263f1d34bce141f0ac4c936e661ebd76533cc0fffcca5",
+              "tags": {
+                "arch": "aarch64",
+                "libc": "glibc",
+                "os": "linux"
+              },
+              "tree_hash": "ffd5a7f2f7b63ef413accafeaaea298c49d4d2af",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.aarch64-linux-gnu.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "aa4a6b83c39952d853e47d85c6dc8003031ecf73ed7099628862c93cb07ce6f2",
+              "tags": {
+                "arch": "aarch64",
+                "libc": "musl",
+                "os": "linux"
+              },
+              "tree_hash": "19233e68b137c0a470a00a8e72725ca3c231522f",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.aarch64-linux-musl.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "c77b45376c17736adbb9a579025cca200eeb83605413f427ebd1dc0dc770c799",
+              "tags": {
+                "arch": "aarch64",
+                "os": "freebsd"
+              },
+              "tree_hash": "29dd91956687b93650e1c1ad8481de43dac31296",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.aarch64-unknown-freebsd.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "357bf3f36fca0e1db56b08691c7aff4566d10826afb4993c2908cb3c1d7badcf",
+              "tags": {
+                "arch": "armv6l",
+                "call_abi": "eabihf",
+                "libc": "glibc",
+                "os": "linux"
+              },
+              "tree_hash": "4a21f2ca0d8ba3abb1e8340bb27406ecc979c92b",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.armv6l-linux-gnueabihf.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "e772113949efa82d6b69177a806d26aca2125971ba6df2b65ca6321f5e5a270c",
+              "tags": {
+                "arch": "armv6l",
+                "call_abi": "eabihf",
+                "libc": "musl",
+                "os": "linux"
+              },
+              "tree_hash": "d66f1ac10d4f5c23459f20523a3b94db1a5962c0",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.armv6l-linux-musleabihf.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "0520f163d096315e34458e1ddcb705255bebeab94b80511dd9858c6e7448fdab",
+              "tags": {
+                "arch": "armv7l",
+                "call_abi": "eabihf",
+                "libc": "glibc",
+                "os": "linux"
+              },
+              "tree_hash": "3c47134a341068fdc4c6e34431bc709a31093a8f",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.armv7l-linux-gnueabihf.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "d29fff0beec603de6b151121c6edfcb4d432b4d90c0d7a3be2e09f76444814e4",
+              "tags": {
+                "arch": "armv7l",
+                "call_abi": "eabihf",
+                "libc": "musl",
+                "os": "linux"
+              },
+              "tree_hash": "5cbbfc835692b14ad653e2eec1bf479e88b5644d",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.armv7l-linux-musleabihf.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "40421bb32cad07f329bd555858a6c8bbd90eac748659505ef7318fddc63896fc",
+              "tags": {
+                "arch": "i686",
+                "libc": "glibc",
+                "os": "linux"
+              },
+              "tree_hash": "bf369d3b2cb6c506bb0897e3041c01e42275c336",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.i686-linux-gnu.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "64750402a823571fb8413e55523cc0a612d11797aba9fb7dd82c846830e6fdbb",
+              "tags": {
+                "arch": "i686",
+                "libc": "musl",
+                "os": "linux"
+              },
+              "tree_hash": "53bb3300f61e57b12e6384ccb5109f560441ad2d",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.i686-linux-musl.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "bbd6dd1fc3c9524438fe34aee14205ddf17ce398912e219557032a77ddbe1118",
+              "tags": {
+                "arch": "i686",
+                "os": "windows"
+              },
+              "tree_hash": "a31a115103e0a37f4992ee7aabf75f10955067fb",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.i686-w64-mingw32.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "ebab7a0c84756d755b9311f45ded214c2acb32a64f8b3c517061dbb00ccee914",
+              "tags": {
+                "arch": "powerpc64le",
+                "libc": "glibc",
+                "os": "linux"
+              },
+              "tree_hash": "af67f6b188502cad70bb3559e3fa272619273311",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.powerpc64le-linux-gnu.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "02fd02139f4fe3246eab316742716cd403d091e3bb2fa4ada6b55ba28f81eeb1",
+              "tags": {
+                "arch": "riscv64",
+                "libc": "glibc",
+                "os": "linux"
+              },
+              "tree_hash": "71a421cd654ded2518b1c06b4786ba527a2ef1f5",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.riscv64-linux-gnu.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "576a0efc4a249f3dc06fd491b6061963d9858b832973355730783f7c13f6519f",
+              "tags": {
+                "arch": "x86_64",
+                "os": "macos"
+              },
+              "tree_hash": "af971d6ddd0bfb74c9495b3e93700b7cc190dc63",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.x86_64-apple-darwin.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "82a946d20bc79d3b0ba4df99db413f52730128b19ee2806f248a4410f22532a1",
+              "tags": {
+                "arch": "x86_64",
+                "libc": "glibc",
+                "os": "linux"
+              },
+              "tree_hash": "715b660f53eb83c33e199a44ececfd8dc03f2a27",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.x86_64-linux-gnu.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "449941e440a6912654154ae0167b56d4e6a5a473e83ba6af9ac0809e7f43d58a",
+              "tags": {
+                "arch": "x86_64",
+                "libc": "musl",
+                "os": "linux"
+              },
+              "tree_hash": "ae2965a84eab19daec0e98939e156cb9573c209c",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.x86_64-linux-musl.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "13a62419f88261c2f078db0eb96e1fa85ad41688e9f729474ce151d798042950",
+              "tags": {
+                "arch": "x86_64",
+                "os": "freebsd"
+              },
+              "tree_hash": "298ddad884d560a186ef30928c7c238cc3c5630f",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.x86_64-unknown-freebsd.tar.gz"
+              ]
+            },
+            {
+              "lazy": false,
+              "sha256": "4672bad158716479b25b3d26a123519bb42843451ea0adf3622ec253d742c81d",
+              "tags": {
+                "arch": "x86_64",
+                "os": "windows"
+              },
+              "tree_hash": "3af036b12a076c2d4c042dde6d956ef4eac2c2ce",
+              "urls": [
+                "https://github.com/JuliaBinaryWrappers/Bzip2_jll.jl/releases/download/Bzip2-v1.0.9+0/Bzip2.v1.0.9.x86_64-w64-mingw32.tar.gz"
+              ]
+            }
+          ]
+        },
+        "integrity": "sha256-043SPkkGFYXx3rYjefxMATv3gxRnLwhAMhc3+2sD5PA="
+      },
+      "https://pkg.julialang.org/package/c27321d9-0574-5035-807b-f59d2c89b15c/246c628cec062230b7d183aab88841fa94fcabe9": {
+        "artifacts": {},
+        "integrity": "sha256-O6H8+J3ktZGBLehfX3FMR0v6vDhyQrGBOo0MrQag4Hw="
+      }
+    }
+  },
   "factsVersions": {}
 }

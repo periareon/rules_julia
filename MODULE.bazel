@@ -7,9 +7,13 @@ module(
 
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "rules_batch", version = "0.0.1")
+bazel_dep(name = "rules_batch", version = "0.1.1")
 bazel_dep(name = "rules_shell", version = "0.7.1")
 bazel_dep(name = "rules_cc", version = "0.2.4")
+
+# TODO: Replace with Bazel's builtin `toml` module should
+# https://github.com/bazelbuild/bazel/pull/27659 land.
+bazel_dep(name = "toml.bzl", version = "0.5.0")
 
 # Register Julia toolchains for development
 julia = use_extension("//julia:extensions.bzl", "julia")
@@ -37,6 +41,21 @@ fmt_deps.pkg_annotation(
 use_repo(
     fmt_deps,
     "rules_julia_fmt",
+)
+
+# Julia package dependencies resolved from plain `Manifest.toml` files. Exercises
+# `pkg.install(manifest = ...)` and the facts persisted in `MODULE.bazel.lock`.
+test_deps = use_extension("//julia/pkg:extensions.bzl", "pkg", dev_dependency = True)
+test_deps.install(
+    name = "rules_julia_test_pkg",
+    manifests = [
+        "//julia/private/tests/pkg_manifest:Manifest-v1.10.toml",
+        "//julia/private/tests/pkg_manifest:Manifest-v1.12.toml",
+    ],
+)
+use_repo(
+    test_deps,
+    "rules_julia_test_pkg",
 )
 
 bazel_dep(name = "stardoc", version = "0.8.0", dev_dependency = True, repo_name = "io_bazel_stardoc")
