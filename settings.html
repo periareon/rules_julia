@@ -158,6 +158,19 @@
                         <!-- Generated with Stardoc: http://skydoc.bazel.build -->
 <h1 id="julia-settings"><a class="header" href="#julia-settings">Julia settings</a></h1>
 <p>Definitions for all <code>@rules_julia//julia</code> settings</p>
+<p><a id="cxxstring_abi"></a></p>
+<h2 id="cxxstring_abi"><a class="header" href="#cxxstring_abi">cxxstring_abi</a></h2>
+<pre>
+--@rules_julia//julia/settings:cxxstring_abi
+</pre>
+<p>The C++ <code>std::string</code> ABI Julia artifacts are selected for.</p>
+<p>Artifacts with C++ code are published for both the pre-GCC 5 (<code>cxx03</code>)
+and the modern (<code>cxx11</code>) ABI. Official Julia binaries use <code>cxx11</code>.</p>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="cxxstring_abi-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"cxxstring_abi"</code></td></tr>
+</tbody></table>
+</div>
 <p><a id="formatter_config"></a></p>
 <h2 id="formatter_config"><a class="header" href="#formatter_config">formatter_config</a></h2>
 <pre>
@@ -167,6 +180,49 @@
 <p><strong>PARAMETERS</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a id="formatter_config-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"formatter_config"</code></td></tr>
+</tbody></table>
+</div>
+<p><a id="julia_minor_version"></a></p>
+<h2 id="julia_minor_version"><a class="header" href="#julia_minor_version">julia_minor_version</a></h2>
+<pre>
+--@rules_julia//julia/settings:julia_minor_version
+</pre>
+<p>Return the <code>&lt;major&gt;.&lt;minor&gt;</code> prefix of a Julia version string.</p>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia_minor_version-version"></a>version</td><td style="text-align: left">A Julia version such as <code>1.12.5</code>.</td><td style="text-align: left">none</td></tr>
+</tbody></table>
+</div>
+<p><a id="julia_minor_versions"></a></p>
+<h2 id="julia_minor_versions"><a class="header" href="#julia_minor_versions">julia_minor_versions</a></h2>
+<pre>
+--@rules_julia//julia/settings:julia_minor_versions
+</pre>
+<p>The minor versions (<code>1.10</code>, <code>1.12</code>, ...) with known toolchains.</p>
+<p><a id="libc"></a></p>
+<h2 id="libc"><a class="header" href="#libc">libc</a></h2>
+<pre>
+--@rules_julia//julia/settings:libc
+</pre>
+<p>The C library Julia artifacts are selected for on Linux.</p>
+<p>Official Julia binaries are built against glibc. Set this to <code>musl</code> when
+using a musl based Julia.</p>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="libc-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"libc"</code></td></tr>
+</tbody></table>
+</div>
+<p><a id="libgfortran_version"></a></p>
+<h2 id="libgfortran_version"><a class="header" href="#libgfortran_version">libgfortran_version</a></h2>
+<pre>
+--@rules_julia//julia/settings:libgfortran_version
+</pre>
+<p>The major version of <code>libgfortran</code> Julia artifacts are selected for.</p>
+<p>Artifacts with Fortran code are published per <code>libgfortran</code> ABI. Official
+Julia binaries bundle <code>libgfortran</code> 5.</p>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="libgfortran_version-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"libgfortran_version"</code></td></tr>
 </tbody></table>
 </div>
 <p><a id="linker"></a></p>
@@ -195,10 +251,14 @@ toolchain; fails if no C++ toolchain resolves.</li>
 <pre>
 --@rules_julia//julia/settings:version
 </pre>
-<p>The version of julia to use</p>
+<p>The version of julia to use.</p>
+<p>Besides the flag, a <code>config_setting</code> named <code>version_&lt;major&gt;.&lt;minor&gt;.&lt;patch&gt;</code>
+is defined per known release and a <code>version_&lt;major&gt;.&lt;minor&gt;</code> setting per
+minor version matching any of its releases. Package graphs resolved for a
+Julia minor version are selected with the latter.</p>
 <p><strong>PARAMETERS</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Options</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a id="version-name"></a>name</td><td style="text-align: left"><p align="center"> - </p></td><td style="text-align: left"><code>"version"</code></td></tr>
+<tr><td style="text-align: left"><a id="version-name"></a>name</td><td style="text-align: left">The name of the flag.</td><td style="text-align: left"><code>"version"</code></td></tr>
 </tbody></table>
 </div>
                     </main>

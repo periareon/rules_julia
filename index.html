@@ -175,6 +175,136 @@ available, request them and select one with the <code>version</code> setting:</p
 </code></pre>
 <pre><code class="language-text">bazel build --@rules_julia//julia/settings:version=1.11.9 //...
 </code></pre>
+<h2 id="package-layout"><a class="header" href="#package-layout">Package layout</a></h2>
+<p>Targets follow Julia's conventions. A <code>julia_library</code> named <code>Foo</code> is loaded
+with <code>using Foo</code> from <code>src/Foo.jl</code> (or <code>Foo.jl</code> next to the <code>BUILD.bazel</code>
+file). When the package directory also holds a <code>Project.toml</code>, list it in
+<code>data</code> so Julia loads the package through it. The package then has the name
+and UUID recorded there, which packages such as <code>Preferences</code> and package
+extensions depend on, and its dependencies resolve from the <code>[deps]</code> table:</p>
+<pre><code class="language-python">julia_library(
+    name = "Foo",
+    srcs = glob(["src/**/*.jl"]),
+    data = ["Project.toml"],
+    deps = ["@deps//:JSON"],
+)
+</code></pre>
+<p>Packages installed by the <code>pkg</code> extension are always set up this way.</p>
+<h2 id="external-dependencies"><a class="header" href="#external-dependencies">External dependencies</a></h2>
+<p>Third party packages are declared the way Julia expects: a <code>Project.toml</code>
+with a resolved <code>Manifest.toml</code> next to it. The <code>pkg</code> module extension turns
+every package in the manifest into a <code>julia_library</code> target.</p>
+<pre><code class="language-python">pkg = use_extension("@rules_julia//julia/pkg:extensions.bzl", "pkg")
+pkg.install(
+    name = "deps",
+    manifest = "//:Manifest.toml",
+)
+use_repo(pkg, "deps")
+</code></pre>
+<p>Packages are then available as <code>@deps//:&lt;PackageName&gt;</code>:</p>
+<pre><code class="language-python">julia_binary(
+    name = "app",
+    srcs = ["app.jl"],
+    deps = ["@deps//:JSON"],
+)
+</code></pre>
+<p>Package tarballs are fetched from the Julia package server using the UUID and
+git tree hash recorded in the manifest. On Bazel 9 and newer the integrity value
+of each tarball is stored in the <code>facts</code> section of <code>MODULE.bazel.lock</code> the first
+time it is needed, so no additional lockfile has to be maintained. Keep
+<code>--lockfile_mode</code> at its default (<code>update</code>) so the facts are persisted.</p>
+<p>A <code>julia_pkg_compiler</code> target resolves manifests from <code>Project.toml</code> without
+leaving Bazel, and <code>julia_pkg_test</code> fails when they drift apart. Pkg resolves
+against one Julia version, so each manifest is declared with the Julia minor
+version it is for and is resolved and verified under a toolchain of that
+version, whatever the <code>version</code> setting selects elsewhere:</p>
+<pre><code class="language-python">load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_compiler", "julia_pkg_test")
+
+julia_pkg_compiler(
+    name = "pkg_update",
+    project_toml = "Project.toml",
+    manifests = {"Manifest.toml": "1.12"},
+)
+
+julia_pkg_test(
+    name = "pkg_test",
+    compiler = ":pkg_update",
+)
+</code></pre>
+<pre><code class="language-text">bazel run //:pkg_update
+bazel run //:pkg_update -- --add JSON
+</code></pre>
+<h3 id="several-julia-versions"><a class="header" href="#several-julia-versions">Several Julia versions</a></h3>
+<p>A manifest is only valid for the Julia minor version that resolved it: the
+standard libraries, compat bounds and Pkg itself all move with the minor
+version. A project supporting several versions carries one manifest per
+version, following Pkg's <code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention, and the
+compiler resolves all of them in one run:</p>
+<pre><code class="language-python">julia_pkg_compiler(
+    name = "pkg_update",
+    project_toml = "Project.toml",
+    manifests = {
+        "Manifest-v1.10.toml": "1.10",
+        "Manifest-v1.12.toml": "1.12",
+    },
+)
+</code></pre>
+<pre><code class="language-python">pkg.install(
+    name = "deps",
+    manifests = [
+        "//:Manifest-v1.10.toml",
+        "//:Manifest-v1.12.toml",
+    ],
+)
+</code></pre>
+<p>The extension reads the Julia version recorded in each manifest and builds a
+package graph per version. <code>@deps//:&lt;PackageName&gt;</code> selects the graph matching
+<code>@rules_julia//julia/settings:version</code>, and every package is marked
+incompatible with other versions, so targets depending on a package without a
+manifest for the selected Julia are skipped by wildcard builds and fail with
+Bazel's standard incompatibility message when built explicitly.</p>
+<h3 id="artifacts"><a class="header" href="#artifacts">Artifacts</a></h3>
+<p>Many packages depend on prebuilt binaries or data shipped as Julia
+<a href="https://pkgdocs.julialang.org/v1/artifacts/">artifacts</a>, most visibly the
+<code>_jll</code> packages wrapping C libraries. These are built by
+<a href="https://github.com/JuliaPackaging/BinaryBuilder.jl">BinaryBuilder</a> inside a
+cross compilation environment that cannot be reproduced in a Bazel action, so
+the published tarballs are consumed as-is, pinned by the SHA-256 and git tree
+hash recorded in each package's <code>Artifacts.toml</code>.</p>
+<p>The <code>pkg</code> extension defines a repository per artifact variant and selects one
+for the target platform at analysis time, so only the variant in use is ever
+downloaded. Operating system and CPU come from the target platform. The
+remaining ABI tags Julia uses to pick a variant are flags that default to what
+official Julia binaries are built with:</p>
+<div class="table-wrapper"><table><thead><tr><th>Flag</th><th>Values</th><th>Default</th></tr></thead><tbody>
+<tr><td><code>@rules_julia//julia/settings:libc</code></td><td><code>glibc</code>, <code>musl</code></td><td><code>glibc</code></td></tr>
+<tr><td><code>@rules_julia//julia/settings:libgfortran_version</code></td><td><code>3</code>, <code>4</code>, <code>5</code></td><td><code>5</code></td></tr>
+<tr><td><code>@rules_julia//julia/settings:cxxstring_abi</code></td><td><code>cxx03</code>, <code>cxx11</code></td><td><code>cxx11</code></td></tr>
+</tbody></table>
+</div>
+<p>Variants that differ only in tags the rules do not model (for example
+<code>libstdcxx_version</code>) resolve to the newest one, matching what <code>Pkg</code> picks on a
+current Julia. A package whose artifact has no variant for the target platform
+fails to analyze with a message listing the platforms it is available for.
+Lazy artifacts, which Julia itself only downloads on first use, are the
+exception: they are fetched like any other where a variant exists, and simply
+omitted on platforms without one, so a package that never touches the artifact
+there still builds. Code that does touch it fails at the point of use, as it
+would under Julia without network access.</p>
+<p>Artifact metadata is recorded next to the package integrity values, in
+<code>MODULE.bazel.lock</code> facts or in <code>Manifest.bazel.json</code>, so reading
+<code>Artifacts.toml</code> happens once per package version.</p>
+<h3 id="publishing-a-module"><a class="header" href="#publishing-a-module">Publishing a module</a></h3>
+<p>Facts are only persisted in the root module's lockfile. A module consumed by
+other Bazel modules should instead ship a <code>Manifest.bazel.json</code> so consumers
+never download tarballs just to learn their hashes. Set <code>manifest_bazel_json</code>
+on <code>julia_pkg_compiler</code> to generate it and pass it to <code>pkg.install</code> as
+<code>lockfile</code> instead of <code>manifest</code>.</p>
+<pre><code class="language-python">pkg.install(
+    name = "deps",
+    lockfile = "//:Manifest.bazel.json",
+)
+</code></pre>
 
                     </main>
 
