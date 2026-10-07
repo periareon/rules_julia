@@ -37,6 +37,7 @@ def _emit_sysimage_object(ctx, *, julia_info, toolchain_info):
         julia_info.runfiles,
         julia_info.depots,
         name = name + ".sysimage",
+        artifact_depots = julia_info.artifact_depots,
     )
     manifest = julia_common.write_runfiles_manifest(
         ctx,
@@ -183,9 +184,9 @@ def _julia_standalone_binary_impl(ctx):
     package = julia_info.app_name
     if not julia_info.entry:
         fail((
-            "{} must be a Julia package: its entry point must be `{}/{}.jl` " +
-            "and define `module {}` with a `julia_main()::Cint` function."
-        ).format(binary.label, julia_info.include, package, package))
+            "{} must be a Julia package: its entry point must be `{}.jl` (or `src/{}.jl`) " +
+            "under `{}` and define `module {}` with a `julia_main()::Cint` function."
+        ).format(binary.label, package, package, julia_info.include, package))
 
     archive = _emit_sysimage_object(ctx, julia_info = julia_info, toolchain_info = toolchain_info)
     sysimage = _link_sysimage(ctx, archive = archive, toolchain_info = toolchain_info)

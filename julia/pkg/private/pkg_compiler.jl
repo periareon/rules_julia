@@ -2,9 +2,11 @@
 Julia Package Manifest Generator for Bazel
 
 This script uses Julia's Pkg manager to resolve dependencies from Project.toml
-and generate/update the Manifest.toml lockfile and Manifest.bazel.json with integrity values.
+and generate/update the Manifest.toml lockfile. Optionally it also writes a
+Manifest.bazel.json with package URLs and integrity values.
 """
 
+using Artifacts
 using Pkg
 using SHA
 using Base64
@@ -27,14 +29,13 @@ function parse_args()
         args[key] = abspath(ENV[var])
     end
 
-    # Optional: Manifest.bazel.json path (defaults to Manifest.bazel.json next to Manifest.toml)
+    # Optional: Manifest.bazel.json path. When unset only Manifest.toml is
+    # written and the `pkg` module extension derives everything else from it.
     if haskey(ENV, "RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON")
         args["manifest_bazel_json"] =
             abspath(ENV["RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON"])
     else
-        # Derive from Manifest.toml path
-        manifest_dir = dirname(args["manifest_toml"])
-        args["manifest_bazel_json"] = joinpath(manifest_dir, "Manifest.bazel.json")
+        args["manifest_bazel_json"] = nothing
     end
 
     # Parse --add {NAME} flags from command line arguments
@@ -133,50 +134,113 @@ function escape_json_string(s::String)
     return String(take!(result))
 end
 
-function write_json_array(io::IO, arr::Vector{String}, indent::String)
-    """Write a JSON array of strings."""
-    if isempty(arr)
-        write(io, "[]")
-        return
-    end
-
-    write(io, "[\n")
-    for (i, item) in enumerate(arr)
-        write(io, indent, "  \"", escape_json_string(item), "\"")
-        if i < length(arr)
-            write(io, ",")
+function write_json_value(io::IO, value, indent::String = "")
+    """Write a JSON value. Dict keys are sorted for deterministic output."""
+    if value isa AbstractString
+        write(io, "\"", escape_json_string(String(value)), "\"")
+    elseif value isa Bool
+        write(io, value ? "true" : "false")
+    elseif value isa AbstractVector
+        if isempty(value)
+            write(io, "[]")
+            return
         end
-        write(io, "\n")
+        write(io, "[\n")
+        for (i, item) in enumerate(value)
+            write(io, indent, "  ")
+            write_json_value(io, item, indent * "  ")
+            if i < length(value)
+                write(io, ",")
+            end
+            write(io, "\n")
+        end
+        write(io, indent, "]")
+    elseif value isa AbstractDict
+        if isempty(value)
+            write(io, "{}")
+            return
+        end
+        write(io, "{\n")
+        keys_list = sort(collect(String, keys(value)))
+        for (i, key) in enumerate(keys_list)
+            write(io, indent, "  \"", escape_json_string(key), "\": ")
+            write_json_value(io, value[key], indent * "  ")
+            if i < length(keys_list)
+                write(io, ",")
+            end
+            write(io, "\n")
+        end
+        write(io, indent, "}")
+    else
+        error("Unsupported type: $(typeof(value))")
     end
-    write(io, indent, "]")
 end
 
 function write_json_object(io::IO, obj::Dict{String,Any}, indent::String = "")
-    """Write a JSON object manually."""
-    write(io, "{\n")
+    """Write a JSON object."""
+    write_json_value(io, obj, indent)
+end
 
-    keys_list = sort(collect(keys(obj)))  # Sort for deterministic output
-    for (i, key) in enumerate(keys_list)
-        value = obj[key]
-        write(io, indent, "  \"", escape_json_string(key), "\": ")
+const ARTIFACT_NON_TAG_KEYS = ("git-tree-sha1", "download", "lazy")
 
-        if value isa String
-            write(io, "\"", escape_json_string(value), "\"")
-        elseif value isa Vector{String}
-            write_json_array(io, value, indent * "  ")
-        elseif value isa Dict
-            write_json_object(io, value, indent * "  ")
-        else
-            error("Unsupported type: $(typeof(value))")
-        end
+function package_artifacts(name::String, uuid::String)
+    """Read the `Artifacts.toml` of an installed package.
 
-        if i < length(keys_list)
-            write(io, ",")
-        end
-        write(io, "\n")
+    Returns a Dict mapping artifact names to a Vector of variants, each a Dict
+    with `tags`, `tree_hash`, `urls`, `sha256` and `lazy`, or `nothing` when
+    the package declares no artifacts.
+    """
+    pkg_id = Base.PkgId(Base.UUID(uuid), name)
+    entry_point = Base.locate_package(pkg_id)
+    if entry_point === nothing
+        error("Unable to locate installed package $name [$uuid]")
     end
+    package_dir = dirname(dirname(entry_point))
 
-    write(io, indent, "}")
+    artifacts_toml = nothing
+    for candidate in ("Artifacts.toml", "JuliaArtifacts.toml")
+        path = joinpath(package_dir, candidate)
+        if isfile(path)
+            artifacts_toml = path
+            break
+        end
+    end
+    artifacts_toml === nothing && return nothing
+
+    artifacts = Dict{String,Any}()
+    for (artifact_name, value) in Artifacts.load_artifacts_toml(artifacts_toml)
+        variants = value isa AbstractVector ? value : [value]
+        entries = Any[]
+        for variant in variants
+            downloads = get(variant, "download", Any[])
+            downloads = downloads isa AbstractVector ? downloads : [downloads]
+            urls = String[]
+            sha256 = ""
+            for download in downloads
+                haskey(download, "url") && push!(urls, String(download["url"]))
+                if isempty(sha256) && haskey(download, "sha256")
+                    sha256 = String(download["sha256"])
+                end
+            end
+            tags = Dict{String,Any}()
+            for (key, tag_value) in variant
+                key in ARTIFACT_NON_TAG_KEYS && continue
+                tags[String(key)] = string(tag_value)
+            end
+            push!(
+                entries,
+                Dict{String,Any}(
+                    "tags" => tags,
+                    "tree_hash" => String(variant["git-tree-sha1"]),
+                    "urls" => urls,
+                    "sha256" => sha256,
+                    "lazy" => get(variant, "lazy", false) === true,
+                ),
+            )
+        end
+        artifacts[String(artifact_name)] = entries
+    end
+    return artifacts
 end
 
 function generate_bazel_lockfile(packages::Dict{String,Any}, output_path::String)
@@ -204,13 +268,18 @@ function generate_bazel_lockfile(packages::Dict{String,Any}, output_path::String
             integrity_value = compute_integrity(url)
             println("✓")
 
-            lockfile[name] = Dict(
+            entry = Dict{String,Any}(
                 "urls" => [url],
                 "integrity" => integrity_value,
                 "deps" => sort(deps),  # Sort dependencies for deterministic output
                 "version" => version,
                 "uuid" => uuid,
             )
+            artifacts = package_artifacts(name, uuid)
+            if artifacts !== nothing && !isempty(artifacts)
+                entry["artifacts"] = artifacts
+            end
+            lockfile[name] = entry
         catch e
             println("✗")
             println(stderr, "  Error downloading $name: $e")
@@ -228,18 +297,19 @@ end
 function generate_manifest(
     project_toml_path::String,
     manifest_toml_path::String,
-    manifest_bazel_json_path::String,
+    manifest_bazel_json_path::Union{String,Nothing},
     packages_to_add::Vector{String} = String[],
 )
-    """Generate Manifest.toml and Manifest.bazel.json from Project.toml using Pkg.
+    """Generate Manifest.toml (and optionally Manifest.bazel.json) from Project.toml using Pkg.
 
     This creates a temporary environment, copies the Project.toml,
-    resolves dependencies, and generates both Manifest.toml and Manifest.bazel.json.
+    resolves dependencies, and generates Manifest.toml. When a
+    Manifest.bazel.json path is given it is generated as well.
 
     Args:
         project_toml_path: Path to the Project.toml file
         manifest_toml_path: Path where Manifest.toml will be written
-        manifest_bazel_json_path: Path where Manifest.bazel.json will be written
+        manifest_bazel_json_path: Optional path where Manifest.bazel.json will be written
         packages_to_add: Optional list of package names to add before resolving dependencies
     """
     println("=" ^ 70)
@@ -247,7 +317,9 @@ function generate_manifest(
     println("=" ^ 70)
     println("Project.toml: $project_toml_path")
     println("Manifest.toml: $manifest_toml_path")
-    println("Manifest.bazel.json: $manifest_bazel_json_path")
+    if manifest_bazel_json_path !== nothing
+        println("Manifest.bazel.json: $manifest_bazel_json_path")
+    end
     println()
 
     # Verify Project.toml exists
@@ -294,13 +366,15 @@ function generate_manifest(
     end
 
 
-    # Parse the manifest and generate Bazel lockfile
-    packages = parse_manifest_toml(temp_manifest)
+    # Optionally generate the Bazel lockfile with integrity values
+    if manifest_bazel_json_path !== nothing
+        packages = parse_manifest_toml(temp_manifest)
 
-    println()
-    println("Generating Bazel lockfile with integrity values...")
-    println()
-    generate_bazel_lockfile(packages, manifest_bazel_json_path)
+        println()
+        println("Generating Bazel lockfile with integrity values...")
+        println()
+        generate_bazel_lockfile(packages, manifest_bazel_json_path)
+    end
 
     # Copy the generated Manifest.toml to the output location
     cp(temp_project, project_toml_path, force = true)
@@ -325,7 +399,7 @@ function main()
     manifest_bazel_json = args["manifest_bazel_json"]
     packages_to_add = args["add"]
 
-    # Generate Manifest.toml and Manifest.bazel.json
+    # Generate Manifest.toml and, if requested, Manifest.bazel.json
     generate_manifest(project_toml, manifest_toml, manifest_bazel_json, packages_to_add)
 end
 
