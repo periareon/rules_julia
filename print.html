@@ -196,7 +196,7 @@ extensions depend on, and its dependencies resolve from the <code>[deps]</code> 
 with a resolved <code>Manifest.toml</code> next to it. The <code>pkg</code> module extension turns
 every package in the manifest into a <code>julia_library</code> target.</p>
 <pre><code class="language-python">pkg = use_extension("@rules_julia//julia/pkg:extensions.bzl", "pkg")
-pkg.install(
+pkg.from_manifest(
     name = "deps",
     manifest = "//:Manifest.toml",
 )
@@ -214,22 +214,22 @@ git tree hash recorded in the manifest. On Bazel 9 and newer the integrity value
 of each tarball is stored in the <code>facts</code> section of <code>MODULE.bazel.lock</code> the first
 time it is needed, so no additional lockfile has to be maintained. Keep
 <code>--lockfile_mode</code> at its default (<code>update</code>) so the facts are persisted.</p>
-<p>A <code>julia_pkg_compiler</code> target resolves manifests from <code>Project.toml</code> without
-leaving Bazel, and <code>julia_pkg_test</code> fails when they drift apart. Pkg resolves
+<p>A <code>julia_pkg_resolve</code> target resolves manifests from <code>Project.toml</code> without
+leaving Bazel, and <code>julia_pkg_resolve_test</code> fails when they drift apart. Pkg resolves
 against one Julia version, so each manifest is declared with the Julia minor
 version it is for and is resolved and verified under a toolchain of that
 version, whatever the <code>version</code> setting selects elsewhere:</p>
-<pre><code class="language-python">load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_compiler", "julia_pkg_test")
+<pre><code class="language-python">load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_resolve", "julia_pkg_resolve_test")
 
-julia_pkg_compiler(
+julia_pkg_resolve(
     name = "pkg_update",
     project_toml = "Project.toml",
     manifests = {"Manifest.toml": "1.12"},
 )
 
-julia_pkg_test(
+julia_pkg_resolve_test(
     name = "pkg_test",
-    compiler = ":pkg_update",
+    resolver = ":pkg_update",
 )
 </code></pre>
 <pre><code class="language-text">bazel run //:pkg_update
@@ -239,9 +239,9 @@ bazel run //:pkg_update -- --add JSON
 <p>A manifest is only valid for the Julia minor version that resolved it: the
 standard libraries, compat bounds and Pkg itself all move with the minor
 version. A project supporting several versions carries one manifest per
-version, following Pkg's <code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention, and the
-compiler resolves all of them in one run:</p>
-<pre><code class="language-python">julia_pkg_compiler(
+version, following Pkg's <code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention, and one
+run of the resolver updates all of them:</p>
+<pre><code class="language-python">julia_pkg_resolve(
     name = "pkg_update",
     project_toml = "Project.toml",
     manifests = {
@@ -250,7 +250,7 @@ compiler resolves all of them in one run:</p>
     },
 )
 </code></pre>
-<pre><code class="language-python">pkg.install(
+<pre><code class="language-python">pkg.from_manifest(
     name = "deps",
     manifests = [
         "//:Manifest-v1.10.toml",
@@ -299,9 +299,9 @@ would under Julia without network access.</p>
 <p>Facts are only persisted in the root module's lockfile. A module consumed by
 other Bazel modules should instead ship a <code>Manifest.bazel.json</code> so consumers
 never download tarballs just to learn their hashes. Set <code>manifest_bazel_json</code>
-on <code>julia_pkg_compiler</code> to generate it and pass it to <code>pkg.install</code> as
+on <code>julia_pkg_resolve</code> to generate it and pass it to <code>pkg.from_manifest</code> as
 <code>lockfile</code> instead of <code>manifest</code>.</p>
-<pre><code class="language-python">pkg.install(
+<pre><code class="language-python">pkg.from_manifest(
     name = "deps",
     lockfile = "//:Manifest.bazel.json",
 )
@@ -587,6 +587,11 @@ Julia minor version are selected with the latter.</p>
 <h1 id="julia-pkg-rules"><a class="header" href="#julia-pkg-rules">Julia Pkg rules</a></h1>
 <h2 id="rules-1"><a class="header" href="#rules-1">Rules</a></h2>
 <ul>
+<li><a href="pkg.html#julia_pkg_resolve">julia_pkg_resolve</a></li>
+<li><a href="pkg.html#julia_pkg_resolve_test">julia_pkg_resolve_test</a></li>
+</ul>
+<h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
+<ul>
 <li><a href="pkg.html#julia_pkg_compiler">julia_pkg_compiler</a></li>
 <li><a href="pkg.html#julia_pkg_test">julia_pkg_test</a></li>
 </ul>
@@ -594,12 +599,12 @@ Julia minor version are selected with the latter.</p>
 <ul>
 <li><a href="pkg.html#pkg">pkg</a></li>
 </ul>
-<p><a id="julia_pkg_compiler"></a></p>
-<h2 id="julia_pkg_compiler"><a class="header" href="#julia_pkg_compiler">julia_pkg_compiler</a></h2>
+<p><a id="julia_pkg_resolve"></a></p>
+<h2 id="julia_pkg_resolve"><a class="header" href="#julia_pkg_resolve">julia_pkg_resolve</a></h2>
 <pre>
-load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_compiler")
+load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_resolve")
 
-julia_pkg_compiler(<a href="pkg.html#julia_pkg_compiler-name">name</a>, <a href="pkg.html#julia_pkg_compiler-manifest_bazel_json">manifest_bazel_json</a>, <a href="pkg.html#julia_pkg_compiler-manifests">manifests</a>, <a href="pkg.html#julia_pkg_compiler-project_toml">project_toml</a>)
+julia_pkg_resolve(<a href="pkg.html#julia_pkg_resolve-name">name</a>, <a href="pkg.html#julia_pkg_resolve-manifest_bazel_json">manifest_bazel_json</a>, <a href="pkg.html#julia_pkg_resolve-manifests">manifests</a>, <a href="pkg.html#julia_pkg_resolve-project_toml">project_toml</a>)
 </pre>
 <p>A rule for resolving Julia manifests from <code>Project.toml</code> using Julia's Pkg manager.</p>
 <p>Running the target resolves the project once per manifest listed in <code>manifests</code>,
@@ -608,18 +613,18 @@ writes the results in place. Pkg resolves against one Julia version (its standar
 libraries, compat bounds and manifest format), so a project supporting several
 Julia minor versions carries one manifest per version, following Pkg's own
 <code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention. Pass the manifests to the <code>pkg</code>
-module extension via <code>pkg.install(manifests = ...)</code>; no additional lockfile is
+module extension via <code>pkg.from_manifest(manifests = ...)</code>; no additional lockfile is
 required.</p>
 <p>Optionally, <code>manifest_bazel_json</code> may be set (with a single manifest) to also
 write a <code>Manifest.bazel.json</code> containing package URLs, integrity values and
-artifacts. Pass that file to <code>pkg.install(lockfile = ...)</code> for modules consumed
+artifacts. Pass that file to <code>pkg.from_manifest(lockfile = ...)</code> for modules consumed
 by other Bazel modules, since module extension facts are only persisted in the
 root module's <code>MODULE.bazel.lock</code>.</p>
 <p>Note that when setting this target up for the first time, empty manifest files
 need to be created. If you specify <code>manifest_bazel_json</code>, that file should also
 be created as an empty JSON object <code>{}</code>.</p>
 <p>Example:</p>
-<pre><code class="language-python">julia_pkg_compiler(
+<pre><code class="language-python">julia_pkg_resolve(
     name = "pkg_update",
     project_toml = "Project.toml",
     manifests = {
@@ -636,25 +641,25 @@ be created as an empty JSON object <code>{}</code>.</p>
 </code></pre>
 <p><strong>ATTRIBUTES</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a id="julia_pkg_compiler-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="julia_pkg_compiler-manifest_bazel_json"></a>manifest_bazel_json</td><td style="text-align: left">An optional <code>Manifest.bazel.json</code> lockfile to generate/update with package URLs, integrity values and artifacts. Only supported with a single manifest.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
-<tr><td style="text-align: left"><a id="julia_pkg_compiler-manifests"></a>manifests</td><td style="text-align: left">Julia manifests keyed by the Julia version each is resolved with, e.g. <code>{"Manifest-v1.10.toml": "1.10", "Manifest-v1.12.toml": "1.12"}</code>. A project supporting a single Julia version lists one <code>Manifest.toml</code>. Each manifest is resolved and verified under a registered toolchain of that version (the newest known patch release when only a minor version is given), regardless of <code>--@rules_julia//julia/settings:version</code>.</td><td style="text-align: left"><a href="https://bazel.build/rules/lib/dict">Dictionary: Label -&gt; String</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="julia_pkg_compiler-project_toml"></a>project_toml</td><td style="text-align: left">The <code>Project.toml</code> file describing dependencies.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_resolve-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_resolve-manifest_bazel_json"></a>manifest_bazel_json</td><td style="text-align: left">An optional <code>Manifest.bazel.json</code> lockfile to generate/update with package URLs, integrity values and artifacts. Only supported with a single manifest.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_resolve-manifests"></a>manifests</td><td style="text-align: left">Julia manifests keyed by the Julia version each is resolved with, e.g. <code>{"Manifest-v1.10.toml": "1.10", "Manifest-v1.12.toml": "1.12"}</code>. A project supporting a single Julia version lists one <code>Manifest.toml</code>. Each manifest is resolved and verified under a registered toolchain of that version (the newest known patch release when only a minor version is given), regardless of <code>--@rules_julia//julia/settings:version</code>.</td><td style="text-align: left"><a href="https://bazel.build/rules/lib/dict">Dictionary: Label -&gt; String</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_resolve-project_toml"></a>project_toml</td><td style="text-align: left">The <code>Project.toml</code> file describing dependencies.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 </tbody></table>
 </div>
-<p><a id="julia_pkg_test"></a></p>
-<h2 id="julia_pkg_test"><a class="header" href="#julia_pkg_test">julia_pkg_test</a></h2>
+<p><a id="julia_pkg_resolve_test"></a></p>
+<h2 id="julia_pkg_resolve_test"><a class="header" href="#julia_pkg_resolve_test">julia_pkg_resolve_test</a></h2>
 <pre>
-load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_test")
+load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_resolve_test")
 
-julia_pkg_test(<a href="pkg.html#julia_pkg_test-name">name</a>, <a href="pkg.html#julia_pkg_test-compiler">compiler</a>)
+julia_pkg_resolve_test(<a href="pkg.html#julia_pkg_resolve_test-name">name</a>, <a href="pkg.html#julia_pkg_resolve_test-resolver">resolver</a>)
 </pre>
-<p>A test rule that verifies the manifests managed by <code>julia_pkg_compiler</code> are up to date.</p>
+<p>A test rule that verifies the manifests managed by <code>julia_pkg_resolve</code> are up to date.</p>
 <p>Every manifest is checked under a Julia toolchain of the version it is declared
 for, by comparing the manifest's recorded <code>project_hash</code> with the hash of the
 current <code>Project.toml</code>. Pkg's hash algorithm differs between Julia minor versions,
-which is why the compiler's declaration drives which Julia runs each check.
-When the compiler also tracks a <code>Manifest.bazel.json</code>, that file is checked
+which is why the resolver's declaration drives which Julia runs each check.
+When the resolver also tracks a <code>Manifest.bazel.json</code>, that file is checked
 against the manifest as well.</p>
 <p>The test will fail if:</p>
 <ul>
@@ -666,15 +671,15 @@ against the manifest as well.</p>
 <li>Integrity values are missing</li>
 </ul>
 <p>Example:</p>
-<pre><code class="language-python">julia_pkg_compiler(
+<pre><code class="language-python">julia_pkg_resolve(
     name = "pkg_update",
     project_toml = "Project.toml",
     manifests = {"Manifest.toml": "1.12"},
 )
 
-julia_pkg_test(
+julia_pkg_resolve_test(
     name = "pkg_sync_test",
-    compiler = ":pkg_update",
+    resolver = ":pkg_update",
 )
 </code></pre>
 <p>Then run:</p>
@@ -684,31 +689,68 @@ julia_pkg_test(
 regenerated.</p>
 <p><strong>ATTRIBUTES</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a id="julia_pkg_test-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="julia_pkg_test-compiler"></a>compiler</td><td style="text-align: left">The <code>julia_pkg_compiler</code> target</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_resolve_test-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_resolve_test-resolver"></a>resolver</td><td style="text-align: left">The <code>julia_pkg_resolve</code> target whose manifests are checked.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
 </tbody></table>
 </div>
+<p><a id="julia_pkg_compiler"></a></p>
+<h2 id="julia_pkg_compiler"><a class="header" href="#julia_pkg_compiler">julia_pkg_compiler</a></h2>
+<pre>
+load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_compiler")
+
+julia_pkg_compiler(<a href="pkg.html#julia_pkg_compiler-name">name</a>, <a href="pkg.html#julia_pkg_compiler-kwargs">**kwargs</a>)
+</pre>
+<p>Resolve Julia manifests from <code>Project.toml</code>; the former name of <code>julia_pkg_resolve</code>.</p>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Default Value</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia_pkg_compiler-name"></a>name</td><td style="text-align: left">The name of the target.</td><td style="text-align: left">none</td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_compiler-kwargs"></a>kwargs</td><td style="text-align: left">Forwarded to <code>julia_pkg_resolve</code>.</td><td style="text-align: left">none</td></tr>
+</tbody></table>
+</div>
+<p><strong>DEPRECATED</strong></p>
+<p>Use <code>julia_pkg_resolve</code>. The rule was renamed because "package
+compiler" means PackageCompiler.jl to Julia users, and this rule runs
+Pkg's resolver. This alias will be removed in a future release.</p>
+<p><a id="julia_pkg_test"></a></p>
+<h2 id="julia_pkg_test"><a class="header" href="#julia_pkg_test">julia_pkg_test</a></h2>
+<pre>
+load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_test")
+
+julia_pkg_test(<a href="pkg.html#julia_pkg_test-name">name</a>, <a href="pkg.html#julia_pkg_test-compiler">compiler</a>, <a href="pkg.html#julia_pkg_test-kwargs">**kwargs</a>)
+</pre>
+<p>Check that manifests are up to date; the former name of <code>julia_pkg_resolve_test</code>.</p>
+<p><strong>PARAMETERS</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Default Value</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia_pkg_test-name"></a>name</td><td style="text-align: left">The name of the target.</td><td style="text-align: left">none</td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_test-compiler"></a>compiler</td><td style="text-align: left">The <code>julia_pkg_resolve</code> (formerly <code>julia_pkg_compiler</code>) target to check; passed on as <code>resolver</code>.</td><td style="text-align: left">none</td></tr>
+<tr><td style="text-align: left"><a id="julia_pkg_test-kwargs"></a>kwargs</td><td style="text-align: left">Forwarded to <code>julia_pkg_resolve_test</code>.</td><td style="text-align: left">none</td></tr>
+</tbody></table>
+</div>
+<p><strong>DEPRECATED</strong></p>
+<p>Use <code>julia_pkg_resolve_test</code> with <code>resolver</code> in place of <code>compiler</code>.
+This alias will be removed in a future release.</p>
 <p><a id="pkg"></a></p>
 <h2 id="pkg"><a class="header" href="#pkg">pkg</a></h2>
 <pre>
 pkg = use_extension("@rules_julia//julia/pkg:defs.bzl", "pkg")
+pkg.from_manifest(<a href="pkg.html#pkg.from_manifest-name">name</a>, <a href="pkg.html#pkg.from_manifest-lockfile">lockfile</a>, <a href="pkg.html#pkg.from_manifest-manifest">manifest</a>, <a href="pkg.html#pkg.from_manifest-manifests">manifests</a>, <a href="pkg.html#pkg.from_manifest-pkg_server">pkg_server</a>)
 pkg.install(<a href="pkg.html#pkg.install-name">name</a>, <a href="pkg.html#pkg.install-lockfile">lockfile</a>, <a href="pkg.html#pkg.install-manifest">manifest</a>, <a href="pkg.html#pkg.install-manifests">manifests</a>, <a href="pkg.html#pkg.install-pkg_server">pkg_server</a>)
 pkg.pkg_annotation(<a href="pkg.html#pkg.pkg_annotation-dep">dep</a>, <a href="pkg.html#pkg.pkg_annotation-patch_args">patch_args</a>, <a href="pkg.html#pkg.pkg_annotation-patch_tool">patch_tool</a>, <a href="pkg.html#pkg.pkg_annotation-patches">patches</a>)
 </pre>
 <p>A module extension for defining Julia package dependencies.</p>
 <pre><code class="language-python">pkg = use_extension("@rules_julia//julia/pkg:extensions.bzl", "pkg")
-pkg.install(
+pkg.from_manifest(
     name = "my_deps",
     manifests = ["//:Manifest.toml"],
 )
 use_repo(pkg, "my_deps")
 </code></pre>
 <p>Each package in the manifests becomes a <code>julia_library</code> target available as
-<code>@my_deps//:&lt;PackageName&gt;</code>. See the <code>install</code> tag for how integrity values and
+<code>@my_deps//:&lt;PackageName&gt;</code>. See the <code>from_manifest</code> tag for how integrity values and
 multiple Julia versions are handled.</p>
 <p><strong>TAG CLASSES</strong></p>
-<p><a id="pkg.install"></a></p>
-<h3 id="install"><a class="header" href="#install">install</a></h3>
+<p><a id="pkg.from_manifest"></a></p>
+<h3 id="from_manifest"><a class="header" href="#from_manifest">from_manifest</a></h3>
 <p>Fetch the Julia packages recorded in one or more <code>Manifest.toml</code> files, or in a
 <code>Manifest.bazel.json</code>.</p>
 <p>Exactly one of <code>manifests</code> (or the single-file alias <code>manifest</code>) or <code>lockfile</code>
@@ -718,22 +760,36 @@ lockfiles. Each manifest records the Julia version that resolved it; its package
 are built for that Julia minor version and marked incompatible with others, and the
 hub selects among manifests with <code>@rules_julia//julia/settings:version</code>. A project
 supporting several Julia versions lists one manifest per minor version (Pkg's
-<code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention); <code>julia_pkg_compiler</code> resolves them all.
+<code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention); <code>julia_pkg_resolve</code> resolves them all.
 Package tarballs are fetched from <code>pkg_server</code> using the UUID and git tree hash
 recorded for each package. On Bazel 9 and newer the integrity value of every tarball
 and the artifacts each package declares are persisted in the <code>facts</code> section of
 <code>MODULE.bazel.lock</code>, so after the first evaluation no network access is needed to
 evaluate the extension. On older Bazel versions the generated repositories are
 recorded in <code>MODULE.bazel.lock</code> instead.</p>
-<p>With <code>lockfile</code>, a <code>Manifest.bazel.json</code> produced by <code>julia_pkg_compiler</code> provides
+<p>With <code>lockfile</code>, a <code>Manifest.bazel.json</code> produced by <code>julia_pkg_resolve</code> provides
 URLs, integrity values and artifacts up front and the extension never touches the
 network. The lockfile carries no Julia version, so its packages are available under
 every version. Prefer this for modules consumed by others, since facts are only
 persisted in the root module's lockfile.</p>
+<p>Pkg itself never runs: the manifest is parsed in Starlark and every package is
+fetched by its recorded hash.</p>
+<p><strong>Attributes</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="pkg.from_manifest-name"></a>name</td><td style="text-align: left">The name of the hub repository to create.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="pkg.from_manifest-lockfile"></a>lockfile</td><td style="text-align: left">A <code>Manifest.bazel.json</code> lockfile produced by <code>julia_pkg_resolve</code>. Mutually exclusive with <code>manifests</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
+<tr><td style="text-align: left"><a id="pkg.from_manifest-manifest"></a>manifest</td><td style="text-align: left">A single <code>Manifest.toml</code>; shorthand for <code>manifests = [...]</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
+<tr><td style="text-align: left"><a id="pkg.from_manifest-manifests"></a>manifests</td><td style="text-align: left"><code>Manifest.toml</code> files, one per supported Julia minor version. Mutually exclusive with <code>lockfile</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+<tr><td style="text-align: left"><a id="pkg.from_manifest-pkg_server"></a>pkg_server</td><td style="text-align: left">The Julia package server to fetch tarballs from when <code>manifests</code> is set.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"https://pkg.julialang.org"</code></td></tr>
+</tbody></table>
+</div>
+<p><a id="pkg.install"></a></p>
+<h3 id="install"><a class="header" href="#install">install</a></h3>
+<p>Deprecated alias of <code>from_manifest</code>, kept for one release.</p>
 <p><strong>Attributes</strong></p>
 <div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a id="pkg.install-name"></a>name</td><td style="text-align: left">The name of the hub repository to create.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-<tr><td style="text-align: left"><a id="pkg.install-lockfile"></a>lockfile</td><td style="text-align: left">A <code>Manifest.bazel.json</code> lockfile produced by <code>julia_pkg_compiler</code>. Mutually exclusive with <code>manifests</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
+<tr><td style="text-align: left"><a id="pkg.install-lockfile"></a>lockfile</td><td style="text-align: left">A <code>Manifest.bazel.json</code> lockfile produced by <code>julia_pkg_resolve</code>. Mutually exclusive with <code>manifests</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
 <tr><td style="text-align: left"><a id="pkg.install-manifest"></a>manifest</td><td style="text-align: left">A single <code>Manifest.toml</code>; shorthand for <code>manifests = [...]</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
 <tr><td style="text-align: left"><a id="pkg.install-manifests"></a>manifests</td><td style="text-align: left"><code>Manifest.toml</code> files, one per supported Julia minor version. Mutually exclusive with <code>lockfile</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
 <tr><td style="text-align: left"><a id="pkg.install-pkg_server"></a>pkg_server</td><td style="text-align: left">The Julia package server to fetch tarballs from when <code>manifests</code> is set.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"https://pkg.julialang.org"</code></td></tr>

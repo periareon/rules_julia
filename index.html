@@ -195,7 +195,7 @@ extensions depend on, and its dependencies resolve from the <code>[deps]</code> 
 with a resolved <code>Manifest.toml</code> next to it. The <code>pkg</code> module extension turns
 every package in the manifest into a <code>julia_library</code> target.</p>
 <pre><code class="language-python">pkg = use_extension("@rules_julia//julia/pkg:extensions.bzl", "pkg")
-pkg.install(
+pkg.from_manifest(
     name = "deps",
     manifest = "//:Manifest.toml",
 )
@@ -213,22 +213,22 @@ git tree hash recorded in the manifest. On Bazel 9 and newer the integrity value
 of each tarball is stored in the <code>facts</code> section of <code>MODULE.bazel.lock</code> the first
 time it is needed, so no additional lockfile has to be maintained. Keep
 <code>--lockfile_mode</code> at its default (<code>update</code>) so the facts are persisted.</p>
-<p>A <code>julia_pkg_compiler</code> target resolves manifests from <code>Project.toml</code> without
-leaving Bazel, and <code>julia_pkg_test</code> fails when they drift apart. Pkg resolves
+<p>A <code>julia_pkg_resolve</code> target resolves manifests from <code>Project.toml</code> without
+leaving Bazel, and <code>julia_pkg_resolve_test</code> fails when they drift apart. Pkg resolves
 against one Julia version, so each manifest is declared with the Julia minor
 version it is for and is resolved and verified under a toolchain of that
 version, whatever the <code>version</code> setting selects elsewhere:</p>
-<pre><code class="language-python">load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_compiler", "julia_pkg_test")
+<pre><code class="language-python">load("@rules_julia//julia/pkg:defs.bzl", "julia_pkg_resolve", "julia_pkg_resolve_test")
 
-julia_pkg_compiler(
+julia_pkg_resolve(
     name = "pkg_update",
     project_toml = "Project.toml",
     manifests = {"Manifest.toml": "1.12"},
 )
 
-julia_pkg_test(
+julia_pkg_resolve_test(
     name = "pkg_test",
-    compiler = ":pkg_update",
+    resolver = ":pkg_update",
 )
 </code></pre>
 <pre><code class="language-text">bazel run //:pkg_update
@@ -238,9 +238,9 @@ bazel run //:pkg_update -- --add JSON
 <p>A manifest is only valid for the Julia minor version that resolved it: the
 standard libraries, compat bounds and Pkg itself all move with the minor
 version. A project supporting several versions carries one manifest per
-version, following Pkg's <code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention, and the
-compiler resolves all of them in one run:</p>
-<pre><code class="language-python">julia_pkg_compiler(
+version, following Pkg's <code>Manifest-v&lt;major&gt;.&lt;minor&gt;.toml</code> convention, and one
+run of the resolver updates all of them:</p>
+<pre><code class="language-python">julia_pkg_resolve(
     name = "pkg_update",
     project_toml = "Project.toml",
     manifests = {
@@ -249,7 +249,7 @@ compiler resolves all of them in one run:</p>
     },
 )
 </code></pre>
-<pre><code class="language-python">pkg.install(
+<pre><code class="language-python">pkg.from_manifest(
     name = "deps",
     manifests = [
         "//:Manifest-v1.10.toml",
@@ -298,9 +298,9 @@ would under Julia without network access.</p>
 <p>Facts are only persisted in the root module's lockfile. A module consumed by
 other Bazel modules should instead ship a <code>Manifest.bazel.json</code> so consumers
 never download tarballs just to learn their hashes. Set <code>manifest_bazel_json</code>
-on <code>julia_pkg_compiler</code> to generate it and pass it to <code>pkg.install</code> as
+on <code>julia_pkg_resolve</code> to generate it and pass it to <code>pkg.from_manifest</code> as
 <code>lockfile</code> instead of <code>manifest</code>.</p>
-<pre><code class="language-python">pkg.install(
+<pre><code class="language-python">pkg.from_manifest(
     name = "deps",
     lockfile = "//:Manifest.bazel.json",
 )
