@@ -1,14 +1,14 @@
-load("//julia/pkg:julia_pkg_compiler.bzl", "julia_pkg_compiler")
-load("//julia/pkg:julia_pkg_test.bzl", "julia_pkg_test")
+load("//julia/pkg:julia_pkg_resolve.bzl", "julia_pkg_resolve")
+load("//julia/pkg:julia_pkg_resolve_test.bzl", "julia_pkg_resolve_test")
 
-julia_pkg_compiler(
+julia_pkg_resolve(
     name = "pkg_update",
     manifest_bazel_json = "//julia/private/format:Manifest.bazel.json",
     manifests = {"//julia/private/format:Manifest.toml": "1.12"},
     project_toml = "//julia/private/format:Project.toml",
 )
 
-julia_pkg_test(
+julia_pkg_resolve_test(
     name = "pkg_test",
-    compiler = ":pkg_update",
+    resolver = ":pkg_update",
 )

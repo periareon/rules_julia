@@ -18,22 +18,22 @@ function parse_args()
 
     # Required environment variables set by the Bazel rule
     required_vars =
-        ["RULES_JULIA_PKG_COMPILER_PROJECT_TOML", "RULES_JULIA_PKG_COMPILER_MANIFEST_TOML"]
+        ["RULES_JULIA_PKG_RESOLVE_PROJECT_TOML", "RULES_JULIA_PKG_RESOLVE_MANIFEST_TOML"]
 
     for var in required_vars
         if !haskey(ENV, var)
             error("Environment variable $var is not set")
         end
         # Convert to absolute path
-        key = lowercase(replace(var, "RULES_JULIA_PKG_COMPILER_" => ""))
+        key = lowercase(replace(var, "RULES_JULIA_PKG_RESOLVE_" => ""))
         args[key] = abspath(ENV[var])
     end
 
     # Optional: Manifest.bazel.json path. When unset only Manifest.toml is
     # written and the `pkg` module extension derives everything else from it.
-    if haskey(ENV, "RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON")
+    if haskey(ENV, "RULES_JULIA_PKG_RESOLVE_MANIFEST_BAZEL_JSON")
         args["manifest_bazel_json"] =
-            abspath(ENV["RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON"])
+            abspath(ENV["RULES_JULIA_PKG_RESOLVE_MANIFEST_BAZEL_JSON"])
     else
         args["manifest_bazel_json"] = nothing
     end

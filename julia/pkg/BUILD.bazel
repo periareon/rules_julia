@@ -3,6 +3,8 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 exports_files([
     "extensions.bzl",
     "julia_pkg_compiler.bzl",
+    "julia_pkg_resolve.bzl",
+    "julia_pkg_resolve_test.bzl",
     "julia_pkg_test.bzl",
     "defs.bzl",
 ])

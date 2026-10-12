@@ -1,10 +1,10 @@
 """
 Julia Package Manifest Generator driver
 
-Runs `pkg_compiler.jl` once per manifest, each time with the Julia that the
+Runs `pkg_resolve.jl` once per manifest, each time with the Julia that the
 manifest is declared for, so every manifest is resolved by its own Pkg. The
 set of manifests, their Julia versions and the interpreters to use come from
-the environment set by the `julia_pkg_compiler` rule.
+the environment set by the `julia_pkg_resolve` rule.
 """
 
 using Runfiles: rlocation
@@ -23,15 +23,15 @@ function main()
         cd(ENV["BUILD_WORKSPACE_DIRECTORY"])
     end
 
-    script = locate(ENV["RULES_JULIA_PKG_COMPILER_SCRIPT"])
-    project_toml = abspath(ENV["RULES_JULIA_PKG_COMPILER_PROJECT_TOML"])
-    manifest_bazel_json = if haskey(ENV, "RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON")
-        abspath(ENV["RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON"])
+    script = locate(ENV["RULES_JULIA_PKG_RESOLVE_SCRIPT"])
+    project_toml = abspath(ENV["RULES_JULIA_PKG_RESOLVE_PROJECT_TOML"])
+    manifest_bazel_json = if haskey(ENV, "RULES_JULIA_PKG_RESOLVE_MANIFEST_BAZEL_JSON")
+        abspath(ENV["RULES_JULIA_PKG_RESOLVE_MANIFEST_BAZEL_JSON"])
     else
         nothing
     end
 
-    entries = split(ENV["RULES_JULIA_PKG_COMPILER_MANIFESTS"], ";"; keepempty = false)
+    entries = split(ENV["RULES_JULIA_PKG_RESOLVE_MANIFESTS"], ";"; keepempty = false)
     failures = String[]
     for entry in entries
         version, manifest, julia_rlocation = split(entry, "|")
@@ -44,14 +44,14 @@ function main()
         println("=" ^ 70)
 
         env = copy(ENV)
-        env["RULES_JULIA_PKG_COMPILER_PROJECT_TOML"] = project_toml
-        env["RULES_JULIA_PKG_COMPILER_MANIFEST_TOML"] = manifest_toml
+        env["RULES_JULIA_PKG_RESOLVE_PROJECT_TOML"] = project_toml
+        env["RULES_JULIA_PKG_RESOLVE_MANIFEST_TOML"] = manifest_toml
         if manifest_bazel_json !== nothing
-            env["RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON"] = manifest_bazel_json
+            env["RULES_JULIA_PKG_RESOLVE_MANIFEST_BAZEL_JSON"] = manifest_bazel_json
         else
-            delete!(env, "RULES_JULIA_PKG_COMPILER_MANIFEST_BAZEL_JSON")
+            delete!(env, "RULES_JULIA_PKG_RESOLVE_MANIFEST_BAZEL_JSON")
         end
-        # Resolve in a clean environment stack; the compiler activates its own.
+        # Resolve in a clean environment stack; the resolver activates its own.
         env["JULIA_LOAD_PATH"] = "@stdlib"
         delete!(env, "JULIA_PROJECT")
 

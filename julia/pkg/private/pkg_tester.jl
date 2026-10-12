@@ -64,11 +64,11 @@ function main()
         exit(0)
     end
 
-    label = ENV["RULES_JULIA_PKG_TEST_COMPILER_LABEL"]
+    label = ENV["RULES_JULIA_PKG_TEST_RESOLVER_LABEL"]
     println("=" ^ 70)
     println("FAILED: " * join(failures, ", "))
     println()
-    println("Please run the pkg_compiler to regenerate the lockfile(s):")
+    println("Please run the resolver to regenerate the lockfile(s):")
     println("  bazel run $(label)")
     println("=" ^ 70)
     exit(1)

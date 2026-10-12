@@ -49,7 +49,7 @@ function check_manifest_current(
     Pkg records a hash of the project's dependencies and compat entries in the
     manifest's `project_hash` field whenever it resolves. Comparing it with the
     hash of the current project detects edits to Project.toml that were not
-    followed by a run of the compiler.
+    followed by a run of the resolver.
 
     The hash algorithm is defined by Pkg and differs between Julia minor
     versions, so this runs under the Julia the manifest is declared for.
@@ -73,7 +73,7 @@ function check_manifest_current(
         push!(
             errors,
             "Manifest.toml was resolved with Julia $(resolved) but is declared for Julia " *
-            "$(expected_version) in the `manifests` attribute. Re-run the compiler to " *
+            "$(expected_version) in the `manifests` attribute. Re-run the resolver to " *
             "resolve it with Julia $(expected_version), or fix the declaration.",
         )
         return errors
