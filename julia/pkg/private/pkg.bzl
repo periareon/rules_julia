@@ -247,7 +247,7 @@ def _packages_from_manifest(module_ctx, attrs, manifest_label, facts):
 
     Args:
         module_ctx (module_ctx): The current module context.
-        attrs (struct): The attributes from the `install` tag class.
+        attrs (struct): The attributes from the `from_manifest` tag class.
         manifest_label (Label): The manifest to read.
         facts (dict): Facts persisted by previous evaluations of the extension (a `Facts` object or a dict).
 
@@ -434,7 +434,7 @@ def _define_graph(*, attrs, prefix, minor, packages, annotations, config_setting
     """Define the repositories of one package graph.
 
     Args:
-        attrs (struct): The attributes from the `install` tag class.
+        attrs (struct): The attributes from the `from_manifest` tag class.
         prefix (str): Repository name prefix for the graph's packages.
         minor (str): The Julia minor version the graph is for, or `None` when unknown.
         packages (dict): Package data in the layout of `Manifest.bazel.json`.
@@ -512,7 +512,7 @@ def install(*, module_ctx, attrs, annotations = {}, facts = {}):
 
     Args:
         module_ctx (module_ctx): The current module context.
-        attrs (struct): The attributes from the `install` tag class.
+        attrs (struct): The attributes from the `from_manifest` tag class.
         annotations (dict): Optional dictionary mapping package names to annotation data.
         facts (dict): Facts persisted by previous evaluations of the extension (a `Facts` object or a dict).
 
@@ -527,9 +527,9 @@ def install(*, module_ctx, attrs, annotations = {}, facts = {}):
         manifests.append(attrs.manifest)
 
     if attrs.lockfile and manifests:
-        fail("`pkg.install(name = \"{}\")` sets both `lockfile` and `manifests`. Only one may be set.".format(attrs.name))
+        fail("`pkg.from_manifest(name = \"{}\")` sets both `lockfile` and `manifests`. Only one may be set.".format(attrs.name))
     if not attrs.lockfile and not manifests:
-        fail("`pkg.install(name = \"{}\")` requires either `manifests` or `lockfile` to be set.".format(attrs.name))
+        fail("`pkg.from_manifest(name = \"{}\")` requires either `manifests` or `lockfile` to be set.".format(attrs.name))
 
     used_facts = {}
     from_manifest = False
@@ -544,7 +544,7 @@ def install(*, module_ctx, attrs, annotations = {}, facts = {}):
         for manifest in manifests:
             graph = _packages_from_manifest(module_ctx, attrs, manifest, facts)
             if graph.minor in seen:
-                fail("`pkg.install(name = \"{}\")`: {} and {} are both resolved for Julia {}".format(
+                fail("`pkg.from_manifest(name = \"{}\")`: {} and {} are both resolved for Julia {}".format(
                     attrs.name,
                     seen[graph.minor],
                     manifest,

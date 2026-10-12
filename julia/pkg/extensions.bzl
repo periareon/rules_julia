@@ -4,7 +4,33 @@ load("//julia/pkg/private:pkg.bzl", "install")
 
 _DEFAULT_PKG_SERVER = "https://pkg.julialang.org"
 
-_install_tag = tag_class(
+_FROM_MANIFEST_ATTRS = {
+    "lockfile": attr.label(
+        doc = "A `Manifest.bazel.json` lockfile produced by `julia_pkg_resolve`. Mutually exclusive with `manifests`.",
+        allow_files = ["Manifest.bazel.json", ".json"],
+        mandatory = False,
+    ),
+    "manifest": attr.label(
+        doc = "A single `Manifest.toml`; shorthand for `manifests = [...]`.",
+        allow_files = ["Manifest.toml", ".toml"],
+        mandatory = False,
+    ),
+    "manifests": attr.label_list(
+        doc = "`Manifest.toml` files, one per supported Julia minor version. Mutually exclusive with `lockfile`.",
+        allow_files = [".toml"],
+        mandatory = False,
+    ),
+    "name": attr.string(
+        doc = "The name of the hub repository to create.",
+        mandatory = True,
+    ),
+    "pkg_server": attr.string(
+        doc = "The Julia package server to fetch tarballs from when `manifests` is set.",
+        default = _DEFAULT_PKG_SERVER,
+    ),
+}
+
+_from_manifest_tag = tag_class(
     doc = """\
 Fetch the Julia packages recorded in one or more `Manifest.toml` files, or in a
 `Manifest.bazel.json`.
@@ -17,7 +43,7 @@ lockfiles. Each manifest records the Julia version that resolved it; its package
 are built for that Julia minor version and marked incompatible with others, and the
 hub selects among manifests with `@rules_julia//julia/settings:version`. A project
 supporting several Julia versions lists one manifest per minor version (Pkg's
-`Manifest-v<major>.<minor>.toml` convention); `julia_pkg_compiler` resolves them all.
+`Manifest-v<major>.<minor>.toml` convention); `julia_pkg_resolve` resolves them all.
 Package tarballs are fetched from `pkg_server` using the UUID and git tree hash
 recorded for each package. On Bazel 9 and newer the integrity value of every tarball
 and the artifacts each package declares are persisted in the `facts` section of
@@ -25,37 +51,21 @@ and the artifacts each package declares are persisted in the `facts` section of
 evaluate the extension. On older Bazel versions the generated repositories are
 recorded in `MODULE.bazel.lock` instead.
 
-With `lockfile`, a `Manifest.bazel.json` produced by `julia_pkg_compiler` provides
+With `lockfile`, a `Manifest.bazel.json` produced by `julia_pkg_resolve` provides
 URLs, integrity values and artifacts up front and the extension never touches the
 network. The lockfile carries no Julia version, so its packages are available under
 every version. Prefer this for modules consumed by others, since facts are only
 persisted in the root module's lockfile.
+
+Pkg itself never runs: the manifest is parsed in Starlark and every package is
+fetched by its recorded hash.
 """,
-    attrs = {
-        "lockfile": attr.label(
-            doc = "A `Manifest.bazel.json` lockfile produced by `julia_pkg_compiler`. Mutually exclusive with `manifests`.",
-            allow_files = ["Manifest.bazel.json", ".json"],
-            mandatory = False,
-        ),
-        "manifest": attr.label(
-            doc = "A single `Manifest.toml`; shorthand for `manifests = [...]`.",
-            allow_files = ["Manifest.toml", ".toml"],
-            mandatory = False,
-        ),
-        "manifests": attr.label_list(
-            doc = "`Manifest.toml` files, one per supported Julia minor version. Mutually exclusive with `lockfile`.",
-            allow_files = [".toml"],
-            mandatory = False,
-        ),
-        "name": attr.string(
-            doc = "The name of the hub repository to create.",
-            mandatory = True,
-        ),
-        "pkg_server": attr.string(
-            doc = "The Julia package server to fetch tarballs from when `manifests` is set.",
-            default = _DEFAULT_PKG_SERVER,
-        ),
-    },
+    attrs = _FROM_MANIFEST_ATTRS,
+)
+
+_install_tag = tag_class(
+    doc = "Deprecated alias of `from_manifest`, kept for one release.",
+    attrs = _FROM_MANIFEST_ATTRS,
 )
 
 _pkg_annotation_tag = tag_class(
@@ -89,11 +99,11 @@ def _pkg_impl(module_ctx):
     supports_facts = hasattr(module_ctx, "facts")
     facts = module_ctx.facts if supports_facts else {}
     new_facts = {}
-    from_manifest = False
+    uses_manifests = False
 
     for mod in module_ctx.modules:
         # Collect annotations from pkg_annotation tags in this module
-        # Annotations apply to all install tags in the same module
+        # Annotations apply to all from_manifest tags in the same module
         annotations = {}
         for annotation_attrs in mod.tags.pkg_annotation:
             package_name = annotation_attrs.dep
@@ -108,18 +118,25 @@ def _pkg_impl(module_ctx):
 
             annotations[package_name] = annotation_data
 
-        # Process install tags with their annotations
         for install_attrs in mod.tags.install:
+            # buildifier: disable=print
+            print("`pkg.install(name = \"{}\")` in module `{}` is deprecated and will be removed in a future release; use `pkg.from_manifest`".format(
+                install_attrs.name,
+                mod.name,
+            ))
+
+        # Process from_manifest tags with their annotations
+        for tag_attrs in list(mod.tags.from_manifest) + list(mod.tags.install):
             result = install(
                 module_ctx = module_ctx,
-                attrs = install_attrs,
+                attrs = tag_attrs,
                 annotations = annotations,
                 facts = facts,
             )
             new_facts.update(result.facts)
-            from_manifest = from_manifest or result.from_manifest
+            uses_manifests = uses_manifests or result.from_manifest
             if mod.is_root:
-                if module_ctx.is_dev_dependency(install_attrs):
+                if module_ctx.is_dev_dependency(tag_attrs):
                     root_module_direct_dev_deps.append(result.hub)
                 else:
                     root_module_direct_deps.append(result.hub)
@@ -137,7 +154,7 @@ def _pkg_impl(module_ctx):
     else:
         # Without facts, let Bazel record the generated repositories (and
         # their integrity values) in the lockfile instead of re-downloading.
-        metadata_kwargs["reproducible"] = not from_manifest
+        metadata_kwargs["reproducible"] = not uses_manifests
 
     return module_ctx.extension_metadata(**metadata_kwargs)
 
@@ -147,7 +164,7 @@ A module extension for defining Julia package dependencies.
 
 ```python
 pkg = use_extension("@rules_julia//julia/pkg:extensions.bzl", "pkg")
-pkg.install(
+pkg.from_manifest(
     name = "my_deps",
     manifests = ["//:Manifest.toml"],
 )
@@ -155,11 +172,12 @@ use_repo(pkg, "my_deps")
 ```
 
 Each package in the manifests becomes a `julia_library` target available as
-`@my_deps//:<PackageName>`. See the `install` tag for how integrity values and
+`@my_deps//:<PackageName>`. See the `from_manifest` tag for how integrity values and
 multiple Julia versions are handled.
 """,
     implementation = _pkg_impl,
     tag_classes = {
+        "from_manifest": _from_manifest_tag,
         "install": _install_tag,
         "pkg_annotation": _pkg_annotation_tag,
     },

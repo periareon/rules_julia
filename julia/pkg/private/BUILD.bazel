@@ -2,8 +2,8 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(":julia_runtime.bzl", "julia_runtime")
 
 exports_files([
-    "pkg_compiler.jl",
-    "pkg_compiler_driver.jl",
+    "pkg_resolve.jl",
+    "pkg_resolve_driver.jl",
     "pkg_tester.jl",
     "pkg_tester_core.jl",
 ])

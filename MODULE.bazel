@@ -29,7 +29,7 @@ julia_dev.toolchain(version = "1.10.10")
 
 # Julia package dependencies for formatting
 fmt_deps = use_extension("//julia/pkg:extensions.bzl", "pkg")
-fmt_deps.install(
+fmt_deps.from_manifest(
     name = "rules_julia_fmt",
     lockfile = "//julia/private/format:Manifest.bazel.json",
 )
@@ -44,9 +44,9 @@ use_repo(
 )
 
 # Julia package dependencies resolved from plain `Manifest.toml` files. Exercises
-# `pkg.install(manifest = ...)` and the facts persisted in `MODULE.bazel.lock`.
+# `pkg.from_manifest(manifest = ...)` and the facts persisted in `MODULE.bazel.lock`.
 test_deps = use_extension("//julia/pkg:extensions.bzl", "pkg", dev_dependency = True)
-test_deps.install(
+test_deps.from_manifest(
     name = "rules_julia_test_pkg",
     manifests = [
         "//julia/private/tests/pkg_manifest:Manifest-v1.10.toml",

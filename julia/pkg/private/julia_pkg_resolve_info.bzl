@@ -1,7 +1,7 @@
-"""JuliaPkgCompileInfo"""
+"""JuliaPkgResolveInfo"""
 
-JuliaPkgCompileInfo = provider(
-    doc = "Components of compiling Julia lock files.",
+JuliaPkgResolveInfo = provider(
+    doc = "Components of resolving Julia manifests.",
     fields = {
         "manifest_bazel_json": "Optional[File]: The Bazel lockfile, when tracked.",
         "manifests": "list[struct]: One entry per manifest with fields `file` (File), `version` (str, the Julia version declared for it) and `runtime` (JuliaRuntimeInfo of a matching toolchain).",

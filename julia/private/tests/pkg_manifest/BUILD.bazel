@@ -1,12 +1,12 @@
-"""Tests for `pkg.install(manifests = ...)`.
+"""Tests for `pkg.from_manifest(manifests = ...)`.
 
 The `rules_julia_test_pkg` hub is defined in `MODULE.bazel` from the
 manifests alone; no `Manifest.bazel.json` exists for it.
 """
 
 load("//julia:julia_test.bzl", "julia_test")
-load("//julia/pkg:julia_pkg_compiler.bzl", "julia_pkg_compiler")
-load("//julia/pkg:julia_pkg_test.bzl", "julia_pkg_test")
+load("//julia/pkg:julia_pkg_resolve.bzl", "julia_pkg_resolve")
+load("//julia/pkg:julia_pkg_resolve_test.bzl", "julia_pkg_resolve_test")
 
 exports_files([
     "Project.toml",
@@ -16,7 +16,7 @@ exports_files([
 
 # One manifest per supported Julia minor version; each is resolved and
 # verified with a toolchain of that version.
-julia_pkg_compiler(
+julia_pkg_resolve(
     name = "pkg_update",
     manifests = {
         "Manifest-v1.10.toml": "1.10",
@@ -25,9 +25,9 @@ julia_pkg_compiler(
     project_toml = "Project.toml",
 )
 
-julia_pkg_test(
+julia_pkg_resolve_test(
     name = "pkg_test",
-    compiler = ":pkg_update",
+    resolver = ":pkg_update",
 )
 
 julia_test(
