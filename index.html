@@ -305,6 +305,46 @@ on <code>julia_pkg_resolve</code> to generate it and pass it to <code>pkg.from_m
     lockfile = "//:Manifest.bazel.json",
 )
 </code></pre>
+<h2 id="publishing-artifacts"><a class="header" href="#publishing-artifacts">Publishing artifacts</a></h2>
+<p>Julia distributes binaries and large data as
+<a href="https://pkgdocs.julialang.org/v1/artifacts/">artifacts</a>: gzipped tarballs
+identified by the git tree hash of their contents, listed in a package's
+<code>Artifacts.toml</code> with a download URL and SHA-256. There is no registry for
+them; any URL works, and GitHub releases are the usual host.</p>
+<p><code>julia_artifact</code> builds one from Bazel targets, so a <code>cc_binary</code>, a
+generated data set or any other output becomes an artifact in exactly the form
+<code>Pkg</code> expects. The tarball is packed with the <code>Tar</code> and <code>7z</code> Julia ships and
+both hashes come from the code <code>Pkg</code> uses to verify downloads:</p>
+<pre><code class="language-python">load("@rules_julia//julia:defs.bzl", "julia_artifact")
+
+julia_artifact(
+    name = "libfoo",
+    srcs = ["include/foo.h"],
+    files = {":libfoo_shared": "lib/libfoo.so"},
+    platform_tags = ["os", "arch", "libc"],
+    url = "https://github.com/me/Foo.jl/releases/download/v1.0.0/{file}",
+)
+</code></pre>
+<p>This produces <code>libfoo.tar.gz</code> and <code>libfoo.Artifacts.toml</code>:</p>
+<pre><code class="language-toml">[[libfoo]]
+arch = "x86_64"
+git-tree-sha1 = "..."
+libc = "glibc"
+os = "linux"
+
+    [[libfoo.download]]
+    sha256 = "..."
+    url = "https://github.com/me/Foo.jl/releases/download/v1.0.0/libfoo.tar.gz"
+</code></pre>
+<p>Upload the tarball to the URL and merge the entry into the package's
+<code>Artifacts.toml</code>. Platform tags are read from the target platform and the
+<code>@rules_julia//julia/settings</code> flags, so building the same target under
+several <code>--platforms</code> gives one entry per platform to concatenate. Leave
+<code>platform_tags</code> empty for platform independent artifacts. Without <code>url</code> the
+entry has no download table, for filling in once the file is hosted.</p>
+<p>Packages themselves need no publishing step: <code>Pkg</code> installs a package from
+its git tree, so a repository built with these rules is registered with
+Registrator or LocalRegistry exactly like any other Julia package.</p>
 
                     </main>
 

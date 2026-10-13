@@ -159,6 +159,7 @@
 <h1 id="julia-bazel-rules"><a class="header" href="#julia-bazel-rules">Julia Bazel rules</a></h1>
 <h2 id="rules"><a class="header" href="#rules">Rules</a></h2>
 <ul>
+<li><a href="#julia_artifact">julia_artifact</a></li>
 <li><a href="#julia_binary">julia_binary</a></li>
 <li><a href="#julia_format_test">julia_format_test</a></li>
 <li><a href="#julia_library">julia_library</a></li>
@@ -174,6 +175,63 @@
 <ul>
 <li><a href="#julia">julia</a></li>
 </ul>
+<p><a id="julia_artifact"></a></p>
+<h2 id="julia_artifact"><a class="header" href="#julia_artifact">julia_artifact</a></h2>
+<pre>
+load("@rules_julia//julia:defs.bzl", "julia_artifact")
+
+julia_artifact(<a href="#julia_artifact-name">name</a>, <a href="#julia_artifact-srcs">srcs</a>, <a href="#julia_artifact-out">out</a>, <a href="#julia_artifact-artifact_name">artifact_name</a>, <a href="#julia_artifact-files">files</a>, <a href="#julia_artifact-lazy">lazy</a>, <a href="#julia_artifact-platform_tags">platform_tags</a>, <a href="#julia_artifact-strip_prefix">strip_prefix</a>, <a href="#julia_artifact-url">url</a>)
+</pre>
+<p>Build a Julia <a href="https://pkgdocs.julialang.org/v1/artifacts/">artifact</a> from Bazel targets.</p>
+<p>Julia distributes binaries and data as artifacts: gzipped tarballs identified by
+the git tree hash of their contents and listed in a package's <code>Artifacts.toml</code>
+with a download URL and SHA-256. This rule produces both halves: the tarball,
+packed with the same <code>Tar</code> and <code>7z</code> Julia itself uses, and an <code>Artifacts.toml</code>
+holding the entry for it, with both hashes computed by the code <code>Pkg</code> uses to
+verify downloads. Upload the tarball to the URL and merge the entry into the
+package's <code>Artifacts.toml</code>; <code>Pkg</code> and <code>artifact"name"</code> then install it like any
+other artifact.</p>
+<p>Files from <code>srcs</code> keep their path relative to the package (or <code>strip_prefix</code>
+below it); <code>files</code> places outputs from anywhere at an explicit path. Directories
+(tree artifacts) are copied whole.</p>
+<p>Platform specific artifacts set <code>platform_tags</code>. The values are taken from the
+target platform (<code>os</code>, <code>arch</code>) and the <code>@rules_julia//julia/settings</code> flags
+(<code>libc</code>, <code>libgfortran_version</code>, <code>cxxstring_abi</code>), so building the same target
+under several <code>--platforms</code> yields one entry per platform, ready to be
+concatenated. Platform independent artifacts (data, models, ...) leave it empty.</p>
+<p>Example:</p>
+<pre><code class="language-python">julia_artifact(
+    name = "libfoo",
+    srcs = ["include/foo.h"],
+    files = {":libfoo_shared": "lib/libfoo.so"},
+    platform_tags = ["os", "arch", "libc"],
+    url = "https://github.com/me/Foo.jl/releases/download/v1.0.0/{file}",
+)
+</code></pre>
+<p>produces <code>libfoo.tar.gz</code> and <code>libfoo.Artifacts.toml</code>:</p>
+<pre><code class="language-toml">[[libfoo]]
+arch = "x86_64"
+git-tree-sha1 = "..."
+libc = "glibc"
+os = "linux"
+
+    [[libfoo.download]]
+    sha256 = "..."
+    url = "https://github.com/me/Foo.jl/releases/download/v1.0.0/libfoo.tar.gz"
+</code></pre>
+<p><strong>ATTRIBUTES</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia_artifact-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-srcs"></a>srcs</td><td style="text-align: left">Files to include at their path relative to the package, or to <code>strip_prefix</code> within it.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-out"></a>out</td><td style="text-align: left">The tarball to write. Defaults to <code>&lt;name&gt;.tar.gz</code>.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">Label</a>; <a href="https://bazel.build/reference/be/common-definitions#configurable-attributes">nonconfigurable</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>None</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-artifact_name"></a>artifact_name</td><td style="text-align: left">The artifact's name in <code>Artifacts.toml</code>. Defaults to the target name.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>""</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-files"></a>files</td><td style="text-align: left">Files or directories to place at an explicit path inside the artifact, mapping each label to its destination. <code>.</code> places a directory's contents at the root.</td><td style="text-align: left"><a href="https://bazel.build/rules/lib/dict">Dictionary: Label -&gt; String</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>{}</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-lazy"></a>lazy</td><td style="text-align: left">Mark the artifact lazy, so Julia only downloads it on first use.</td><td style="text-align: left">Boolean</td><td style="text-align: left">optional</td><td style="text-align: left"><code>False</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-platform_tags"></a>platform_tags</td><td style="text-align: left">Platform tags to record, any of <code>os</code>, <code>arch</code>, <code>libc</code>, <code>libgfortran_version</code> and <code>cxxstring_abi</code>. Empty for platform independent artifacts. <code>libc</code> is only recorded on Linux.</td><td style="text-align: left">List of strings</td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-strip_prefix"></a>strip_prefix</td><td style="text-align: left">A directory below the package that <code>srcs</code> paths are made relative to.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>""</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_artifact-url"></a>url</td><td style="text-align: left">The URL the tarball will be downloadable from, recorded in the entry. <code>{file}</code> expands to the tarball's file name. Without it the entry has no download table.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>""</code></td></tr>
+</tbody></table>
+</div>
 <p><a id="julia_binary"></a></p>
 <h2 id="julia_binary"><a class="header" href="#julia_binary">julia_binary</a></h2>
 <pre>
