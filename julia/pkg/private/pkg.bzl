@@ -1,11 +1,11 @@
 """Bazel tools for interfacing with Julia packages"""
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("//julia/private:platforms.bzl", "choose_variants", "config_setting_text")
 load("//julia/settings:settings.bzl", "julia_minor_version", "julia_minor_versions")
 load(":artifact_repository.bzl", "julia_artifact_repository")
 load(":artifacts_toml.bzl", "parse_artifacts_toml")
 load(":manifest_toml.bzl", "parse_manifest_toml")
-load(":platforms.bzl", "choose_variants", "config_setting_text")
 
 _VERSION_SETTING = "@rules_julia//julia/settings:version_{}"
 

@@ -2,6 +2,7 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(":binary_wrapper.bzl", "julia_binary_wrapper")
 
 exports_files([
+    "artifact.jl",
     "binary_wrapper.bat.tpl",
     "binary_wrapper.sh.tpl",
     "binary_wrapper_maker.jl",
@@ -32,10 +33,11 @@ julia_binary_wrapper(
 bzl_library(
     name = "bzl_lib",
     srcs = glob(["*.bzl"]) + ["@rules_cc//cc:bzl_srcs"],
-    visibility = ["//julia:__pkg__"],
+    visibility = ["//julia:__subpackages__"],
     deps = [
         "//julia/settings:settings_bzl",
         "@bazel_skylib//lib:dicts",
+        "@bazel_skylib//rules:common_settings",
         "@rules_cc//cc/common",
     ],
 )

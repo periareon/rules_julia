@@ -193,3 +193,53 @@ pkg.from_manifest(
     lockfile = "//:Manifest.bazel.json",
 )
 ```
+
+## Publishing artifacts
+
+Julia distributes binaries and large data as
+[artifacts](https://pkgdocs.julialang.org/v1/artifacts/): gzipped tarballs
+identified by the git tree hash of their contents, listed in a package's
+`Artifacts.toml` with a download URL and SHA-256. There is no registry for
+them; any URL works, and GitHub releases are the usual host.
+
+`julia_artifact` builds one from Bazel targets, so a `cc_binary`, a
+generated data set or any other output becomes an artifact in exactly the form
+`Pkg` expects. The tarball is packed with the `Tar` and `7z` Julia ships and
+both hashes come from the code `Pkg` uses to verify downloads:
+
+```python
+load("@rules_julia//julia:defs.bzl", "julia_artifact")
+
+julia_artifact(
+    name = "libfoo",
+    srcs = ["include/foo.h"],
+    files = {":libfoo_shared": "lib/libfoo.so"},
+    platform_tags = ["os", "arch", "libc"],
+    url = "https://github.com/me/Foo.jl/releases/download/v1.0.0/{file}",
+)
+```
+
+This produces `libfoo.tar.gz` and `libfoo.Artifacts.toml`:
+
+```toml
+[[libfoo]]
+arch = "x86_64"
+git-tree-sha1 = "..."
+libc = "glibc"
+os = "linux"
+
+    [[libfoo.download]]
+    sha256 = "..."
+    url = "https://github.com/me/Foo.jl/releases/download/v1.0.0/libfoo.tar.gz"
+```
+
+Upload the tarball to the URL and merge the entry into the package's
+`Artifacts.toml`. Platform tags are read from the target platform and the
+`@rules_julia//julia/settings` flags, so building the same target under
+several `--platforms` gives one entry per platform to concatenate. Leave
+`platform_tags` empty for platform independent artifacts. Without `url` the
+entry has no download table, for filling in once the file is hosted.
+
+Packages themselves need no publishing step: `Pkg` installs a package from
+its git tree, so a repository built with these rules is registered with
+Registrator or LocalRegistry exactly like any other Julia package.
