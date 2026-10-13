@@ -2,7 +2,7 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load("//julia/pkg/private:artifacts_toml.bzl", "parse_artifacts_toml")
-load("//julia/pkg/private:platforms.bzl", "choose_variants", "config_setting_text", "selection_key")
+load("//julia/private:platforms.bzl", "choose_variants", "config_setting_text", "selection_key")
 
 _ARTIFACTS = """\
 [[Bzip2]]

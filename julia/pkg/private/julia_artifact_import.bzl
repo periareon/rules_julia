@@ -1,8 +1,8 @@
-"""The `julia_artifact` rule."""
+"""The `julia_artifact_import` rule."""
 
 load("//julia/private:providers.bzl", "JuliaInfo")
 
-def _julia_artifact_impl(ctx):
+def _julia_artifact_import_impl(ctx):
     # The repository root doubles as a depot: files live under
     # `artifacts/<tree_hash>/`, which is where Julia looks for them.
     depot = ctx.label.workspace_name
@@ -30,7 +30,7 @@ def _julia_artifact_impl(ctx):
         ),
     ]
 
-julia_artifact = rule(
+julia_artifact_import = rule(
     doc = """\
 A prebuilt Julia artifact, consumable as a dependency of Julia targets.
 
@@ -38,7 +38,7 @@ The rule contributes no sources. It adds the artifact's files to runfiles and
 its directory to the depots Julia searches, so `artifact"name"` lookups and
 JLL packages find the files at build and run time.
 """,
-    implementation = _julia_artifact_impl,
+    implementation = _julia_artifact_import_impl,
     attrs = {
         "artifact_name": attr.string(
             doc = "The name of the artifact in `Artifacts.toml`.",

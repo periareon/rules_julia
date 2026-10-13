@@ -3,3 +3,6 @@
 *.bat text eol=crlf
 *.bat.tpl text eol=crlf
 *.cmd text eol=crlf
+
+# Artifact test inputs are hashed byte-for-byte
+julia/private/tests/artifact/data/** -text

@@ -24,6 +24,7 @@ bzl_library(
     visibility = ["//julia/pkg:__pkg__"],
     deps = [
         ":bazel_tools_bzl_lib",
+        "//julia/private:bzl_lib",
         "@toml.bzl//:toml",
     ],
 )

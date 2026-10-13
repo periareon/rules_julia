@@ -1,0 +1,94 @@
+"""Tests for `julia_artifact`."""
+
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//julia:julia_artifact.bzl", "julia_artifact")
+load("//julia:julia_test.bzl", "julia_test")
+
+write_file(
+    name = "tool",
+    out = "generated/tool.sh",
+    content = [
+        "#!/bin/sh",
+        "echo tool",
+        "",
+    ],
+    is_executable = True,
+    newline = "unix",
+)
+
+# A platform independent artifact mixing source and generated files.
+julia_artifact(
+    name = "data",
+    srcs = [
+        "data/hello.txt",
+        "data/nested/numbers.csv",
+    ],
+    out = "data.tar.gz",
+    files = {":tool": "bin/tool.sh"},
+    strip_prefix = "data",
+    url = "https://example.com/artifacts/{file}",
+)
+
+filegroup(
+    name = "data_toml",
+    srcs = [":data"],
+    output_group = "artifacts_toml",
+)
+
+# The same content built by another target must be byte for byte identical,
+# otherwise the recorded hashes would depend on which machine built it.
+julia_artifact(
+    name = "data_again",
+    srcs = [
+        "data/hello.txt",
+        "data/nested/numbers.csv",
+    ],
+    out = "data_again.tar.gz",
+    artifact_name = "data",
+    files = {":tool": "bin/tool.sh"},
+    strip_prefix = "data",
+)
+
+diff_test(
+    name = "reproducible_test",
+    file1 = ":data.tar.gz",
+    file2 = ":data_again.tar.gz",
+)
+
+# A lazy, platform specific artifact tagged for the target platform.
+julia_artifact(
+    name = "native",
+    srcs = ["data/hello.txt"],
+    lazy = True,
+    platform_tags = [
+        "os",
+        "arch",
+        "libc",
+        "libgfortran_version",
+        "cxxstring_abi",
+    ],
+    strip_prefix = "data",
+)
+
+filegroup(
+    name = "native_toml",
+    srcs = [":native"],
+    output_group = "artifacts_toml",
+)
+
+julia_test(
+    name = "artifact_test",
+    srcs = ["artifact_test.jl"],
+    data = [
+        ":data.tar.gz",
+        ":data_toml",
+        ":native_toml",
+    ],
+    env = {
+        "DATA_TARBALL": "$(rlocationpath :data.tar.gz)",
+        "DATA_TOML": "$(rlocationpath :data_toml)",
+        "NATIVE_TOML": "$(rlocationpath :native_toml)",
+    },
+    deps = ["//julia/runfiles"],
+)
