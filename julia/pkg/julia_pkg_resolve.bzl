@@ -1,7 +1,6 @@
 """Rules for generating Julia manifests from Project.toml"""
 
 load("//julia/pkg/private:julia_pkg_resolve_info.bzl", "JuliaPkgResolveInfo")
-load("//julia/pkg/private:julia_runtime.bzl", "JuliaRuntimeInfo")
 load("//julia/pkg/private:julia_version.bzl", "MANIFESTS_ATTR_DOC", "julia_versions_split")
 load("//julia/private:julia_common.bzl", "julia_common")
 load("//julia/private:providers.bzl", "JuliaInfo")
@@ -10,7 +9,7 @@ def _manifest_entries(ctx):
     """Pair every manifest with its declared version and a matching runtime."""
     runtimes = {}
     for version, target in ctx.split_attr._runtime.items():
-        runtimes[version] = target[JuliaRuntimeInfo]
+        runtimes[version] = target[platform_common.ToolchainInfo]
 
     entries = []
     for target, version in ctx.attr.manifests.items():
@@ -165,8 +164,8 @@ bazel run //:pkg_update -- --add JSON
         "_runtime": attr.label(
             doc = "A Julia interpreter per declared version.",
             cfg = julia_versions_split,
-            providers = [JuliaRuntimeInfo],
-            default = Label("//julia/pkg/private:julia_runtime"),
+            providers = [platform_common.ToolchainInfo],
+            default = Label("//julia:current_julia_toolchain"),
         ),
     } | julia_common.BINARY_ATTRS,
     executable = True,

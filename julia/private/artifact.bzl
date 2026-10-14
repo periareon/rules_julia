@@ -3,7 +3,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load(":julia_common.bzl", "DRIVER_ATTRS", "julia_common")
 load(":platforms.bzl", "ARCH_CONSTRAINTS", "OS_CONSTRAINTS")
-load(":toolchain.bzl", "TOOLCHAIN_TYPE")
 
 JuliaArtifactInfo = provider(
     doc = "A Julia artifact tarball and the `Artifacts.toml` entry describing it.",
@@ -132,7 +131,9 @@ def _artifact_entries(ctx):
     return entries
 
 def _julia_artifact_impl(ctx):
-    toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
+    # Packing a tarball is not native code: it runs with the Julia of the
+    # execution platform, while the platform tags describe the target.
+    toolchain_info = ctx.attr._julia_toolchain_exec[platform_common.ToolchainInfo]
     artifact_name = ctx.attr.artifact_name or ctx.label.name
 
     tarball = ctx.outputs.out or ctx.actions.declare_file(ctx.label.name + ".tar.gz")
@@ -280,6 +281,12 @@ os = "linux"
             default = Label("//julia/private:artifact.jl"),
             allow_single_file = True,
         ),
+        "_julia_toolchain_exec": attr.label(
+            doc = "The Julia toolchain of the execution platform, which runs the packing step.",
+            cfg = "exec",
+            default = Label("//julia:current_julia_toolchain"),
+            providers = [platform_common.ToolchainInfo],
+        ),
         "_libc": attr.label(
             default = Label("//julia/settings:libc"),
         ),
@@ -291,5 +298,4 @@ os = "linux"
         ),
     } | DRIVER_ATTRS,
     provides = [JuliaArtifactInfo],
-    toolchains = [TOOLCHAIN_TYPE],
 )

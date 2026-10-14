@@ -18,12 +18,43 @@ _MEMORY_MB = 10240
 def _sysimage_resource_set(_os_name, _inputs_size):
     return {"cpu": _IMAGE_THREADS, "memory": _MEMORY_MB}
 
-def _emit_sysimage_object(ctx, *, julia_info, toolchain_info):
+def _image_contents(ctx, deps):
+    """Merge the packages to compile into one image.
+
+    Args:
+        ctx: Rule context.
+        deps (list[Target]): Package targets providing `JuliaInfo`.
+
+    Returns:
+        struct: `packages` (module names), `includes`, `runfiles`, `depots`
+            and `artifact_depots` of all packages and their dependencies.
+    """
+    packages = []
+    runfiles = ctx.runfiles()
+    for dep in deps:
+        julia_info = dep[JuliaInfo]
+        if not julia_info.entry:
+            fail((
+                "{} must be a Julia package to be compiled into a system image: its entry " +
+                "point must be `{}.jl` (or `src/{}.jl`) under `{}` and define `module {}`."
+            ).format(dep.label, julia_info.app_name, julia_info.app_name, julia_info.include, julia_info.app_name))
+        packages.append(julia_info.app_name)
+        runfiles = runfiles.merge(julia_info.runfiles)
+
+    return struct(
+        packages = packages,
+        includes = depset(transitive = [dep[JuliaInfo].includes for dep in deps]),
+        runfiles = runfiles,
+        depots = depset(transitive = [dep[JuliaInfo].depots for dep in deps]),
+        artifact_depots = depset(transitive = [dep[JuliaInfo].artifact_depots for dep in deps]),
+    )
+
+def _emit_sysimage_object(ctx, *, contents, toolchain_info):
     """Run `julia --output-o` to emit the object archive of a system image.
 
     Args:
         ctx: Rule context.
-        julia_info (JuliaInfo): Provider of the package to include.
+        contents (struct): The packages to include, from `_image_contents`.
         toolchain_info (ToolchainInfo): The Julia toolchain.
 
     Returns:
@@ -33,22 +64,22 @@ def _emit_sysimage_object(ctx, *, julia_info, toolchain_info):
     archive = ctx.actions.declare_file("{}.sysimage.a".format(name))
     config = julia_common.create_config_file(
         ctx,
-        julia_info.includes,
-        julia_info.runfiles,
-        julia_info.depots,
+        contents.includes,
+        contents.runfiles,
+        contents.depots,
         name = name + ".sysimage",
-        artifact_depots = julia_info.artifact_depots,
+        artifact_depots = contents.artifact_depots,
     )
     manifest = julia_common.write_runfiles_manifest(
         ctx,
         "{}.sysimage_manifest".format(name),
-        julia_info.runfiles.files,
+        contents.runfiles.files,
     )
 
     args = ctx.actions.args()
     args.add("--config", config)
     args.add("--manifest", manifest)
-    args.add("--package", julia_info.app_name)
+    args.add_all(contents.packages, before_each = "--package")
     args.add_all(ctx.files.precompile_statements, before_each = "--precompile-statements")
 
     julia_flags = [
@@ -66,7 +97,7 @@ def _emit_sysimage_object(ctx, *, julia_info, toolchain_info):
         arguments = args,
         inputs = depset(
             [config, manifest] + ctx.files.precompile_statements,
-            transitive = [julia_info.runfiles.files],
+            transitive = [contents.runfiles.files],
         ),
         outputs = [archive],
         mnemonic = "JuliaSysimage",
@@ -188,7 +219,8 @@ def _julia_standalone_binary_impl(ctx):
             "under `{}` and define `module {}` with a `julia_main()::Cint` function."
         ).format(binary.label, package, package, julia_info.include, package))
 
-    archive = _emit_sysimage_object(ctx, julia_info = julia_info, toolchain_info = toolchain_info)
+    contents = _image_contents(ctx, [binary])
+    archive = _emit_sysimage_object(ctx, contents = contents, toolchain_info = toolchain_info)
     sysimage = _link_sysimage(ctx, archive = archive, toolchain_info = toolchain_info)
 
     main = ctx.actions.declare_file("{}.main.jl".format(ctx.label.name))
@@ -207,6 +239,97 @@ def _julia_standalone_binary_impl(ctx):
         main = main,
         sysimage = sysimage,
     )
+
+_SYSIMAGE_ATTRS = {
+    "cpu_target": attr.string(
+        doc = (
+            "The `--cpu-target` to compile the system image for. Defaults to the " +
+            "toolchain's portable multi-versioned target for its architecture."
+        ),
+    ),
+    "precompile_statements": attr.label_list(
+        doc = (
+            "Files of precompile statements (as produced by `julia --trace-compile`) " +
+            "whose methods are compiled into the system image."
+        ),
+        allow_files = True,
+    ),
+    "_link_driver": attr.label(
+        default = Label("//julia/private:link.jl"),
+        allow_single_file = True,
+    ),
+    "_linker": attr.label(
+        default = Label("//julia/settings:linker"),
+    ),
+    "_sysimage_driver": attr.label(
+        default = Label("//julia/private:sysimage.jl"),
+        allow_single_file = True,
+    ),
+}
+
+_SYSIMAGE_TOOLCHAINS = [
+    TOOLCHAIN_TYPE,
+    # Only used (and only required) when `//julia/settings:linker=cc`.
+    config_common.toolchain_type(_CC_TOOLCHAIN_TYPE, mandatory = False),
+]
+
+def _julia_sysimage_impl(ctx):
+    toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
+    if not toolchain_info.sysimage:
+        fail("The Julia toolchain for {} does not provide a stock system image.".format(ctx.label))
+
+    contents = _image_contents(ctx, ctx.attr.deps)
+    archive = _emit_sysimage_object(ctx, contents = contents, toolchain_info = toolchain_info)
+    sysimage = _link_sysimage(ctx, archive = archive, toolchain_info = toolchain_info)
+
+    return [
+        DefaultInfo(files = depset([sysimage])),
+        OutputGroupInfo(archive = depset([archive])),
+    ]
+
+julia_sysimage = rule(
+    doc = """\
+Compile Julia packages and their dependencies into a system image.
+
+A system image is Julia's own ahead-of-time format: the shared library that
+`julia --sysimage` loads in place of the stock one, with every included module
+already compiled. The image is produced in two actions: `julia --output-o`
+emits the object archive, which is then linked into a shared library. By
+default the link uses the `lld` bundled with Julia, the same way Julia links
+its own package images; `--@rules_julia//julia/settings:linker=cc` selects the
+C++ toolchain instead. No network access or host tools outside the Bazel
+toolchains are involved, and the image is rebuilt only when its inputs change.
+
+Every target in `deps` must be a Julia package: its entry point is
+`src/<name>.jl` defining `module <name>`. The output is the shared library;
+the object archive is available in the `archive` output group. For a
+self-contained executable around a package with a `julia_main` function, see
+`julia_standalone_binary`, which builds on the same actions.
+
+Example:
+
+```python
+julia_sysimage(
+    name = "image",
+    deps = ["@deps//:JSON", "//my/lib"],
+)
+```
+
+```sh
+julia --sysimage=$(bazel cquery --output=files //:image) -e 'using JSON'
+```
+""",
+    implementation = _julia_sysimage_impl,
+    attrs = {
+        "deps": attr.label_list(
+            doc = "The packages to compile into the image.",
+            mandatory = True,
+            providers = [JuliaInfo],
+        ),
+    } | _SYSIMAGE_ATTRS | julia_common.DRIVER_ATTRS,
+    toolchains = _SYSIMAGE_TOOLCHAINS,
+    fragments = ["cpp"],
+)
 
 julia_standalone_binary = rule(
     doc = """\
@@ -248,36 +371,8 @@ julia_standalone_binary(
             mandatory = True,
             providers = [JuliaInfo],
         ),
-        "cpu_target": attr.string(
-            doc = (
-                "The `--cpu-target` to compile the system image for. Defaults to the " +
-                "toolchain's portable multi-versioned target for its architecture."
-            ),
-        ),
-        "precompile_statements": attr.label_list(
-            doc = (
-                "Files of precompile statements (as produced by `julia --trace-compile`) " +
-                "whose methods are compiled into the system image."
-            ),
-            allow_files = True,
-        ),
-        "_link_driver": attr.label(
-            default = Label("//julia/private:link.jl"),
-            allow_single_file = True,
-        ),
-        "_linker": attr.label(
-            default = Label("//julia/settings:linker"),
-        ),
-        "_sysimage_driver": attr.label(
-            default = Label("//julia/private:sysimage.jl"),
-            allow_single_file = True,
-        ),
-    } | julia_common.BINARY_ATTRS,
+    } | _SYSIMAGE_ATTRS | julia_common.BINARY_ATTRS,
     executable = True,
-    toolchains = [
-        TOOLCHAIN_TYPE,
-        # Only used (and only required) when `//julia/settings:linker=cc`.
-        config_common.toolchain_type(_CC_TOOLCHAIN_TYPE, mandatory = False),
-    ],
+    toolchains = _SYSIMAGE_TOOLCHAINS,
     fragments = ["cpp"],
 )

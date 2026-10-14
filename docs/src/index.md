@@ -50,6 +50,28 @@ julia_library(
 
 Packages installed by the `pkg` extension are always set up this way.
 
+## System images
+
+A system image is Julia's own ahead-of-time format: the shared library
+`julia --sysimage` loads in place of the stock one, with every included module
+already compiled, so loading them costs nothing at startup. `julia_sysimage`
+produces one from a set of packages and their dependencies as an ordinary,
+cached target:
+
+```python
+julia_sysimage(
+    name = "image",
+    deps = ["@deps//:JSON", "//my/lib"],
+)
+```
+
+```text
+julia --sysimage="$(bazel cquery --output=files //:image)" -e 'using JSON'
+```
+
+`julia_standalone_binary` builds on the same actions to produce an executable
+around a package with a `julia_main` function.
+
 ## External dependencies
 
 Third party packages are declared the way Julia expects: a `Project.toml`

@@ -12,6 +12,15 @@ stardoc(
 )
 
 stardoc(
+    name = "extensions",
+    out = "src/extensions.md",
+    input = "//julia:extensions.bzl",
+    table_of_contents_template = "@io_bazel_stardoc//stardoc:templates/markdown_tables/table_of_contents.vm",
+    tags = ["manual"],
+    deps = ["@rules_julia//julia:defs_bzl"],
+)
+
+stardoc(
     name = "pkg",
     out = "src/pkg.md",
     input = "//julia/pkg:defs.bzl",
@@ -32,6 +41,7 @@ stardoc(
 mdbook(
     name = "book",
     srcs = glob(["src/**/*.md"]) + [
+        ":extensions",
         ":pkg",
         ":rules",
         ":settings",
