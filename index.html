@@ -190,6 +190,21 @@ extensions depend on, and its dependencies resolve from the <code>[deps]</code> 
 )
 </code></pre>
 <p>Packages installed by the <code>pkg</code> extension are always set up this way.</p>
+<h2 id="system-images"><a class="header" href="#system-images">System images</a></h2>
+<p>A system image is Julia's own ahead-of-time format: the shared library
+<code>julia --sysimage</code> loads in place of the stock one, with every included module
+already compiled, so loading them costs nothing at startup. <code>julia_sysimage</code>
+produces one from a set of packages and their dependencies as an ordinary,
+cached target:</p>
+<pre><code class="language-python">julia_sysimage(
+    name = "image",
+    deps = ["@deps//:JSON", "//my/lib"],
+)
+</code></pre>
+<pre><code class="language-text">julia --sysimage="$(bazel cquery --output=files //:image)" -e 'using JSON'
+</code></pre>
+<p><code>julia_standalone_binary</code> builds on the same actions to produce an executable
+around a package with a <code>julia_main</code> function.</p>
 <h2 id="external-dependencies"><a class="header" href="#external-dependencies">External dependencies</a></h2>
 <p>Third party packages are declared the way Julia expects: a <code>Project.toml</code>
 with a resolved <code>Manifest.toml</code> next to it. The <code>pkg</code> module extension turns

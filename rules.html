@@ -164,16 +164,13 @@
 <li><a href="#julia_format_test">julia_format_test</a></li>
 <li><a href="#julia_library">julia_library</a></li>
 <li><a href="#julia_standalone_binary">julia_standalone_binary</a></li>
+<li><a href="#julia_sysimage">julia_sysimage</a></li>
 <li><a href="#julia_test">julia_test</a></li>
 <li><a href="#julia_toolchain">julia_toolchain</a></li>
 </ul>
 <h2 id="aspects"><a class="header" href="#aspects">Aspects</a></h2>
 <ul>
 <li><a href="#julia_format_aspect">julia_format_aspect</a></li>
-</ul>
-<h2 id="module-extensions"><a class="header" href="#module-extensions">Module Extensions</a></h2>
-<ul>
-<li><a href="#julia">julia</a></li>
 </ul>
 <p><a id="julia_artifact"></a></p>
 <h2 id="julia_artifact"><a class="header" href="#julia_artifact">julia_artifact</a></h2>
@@ -322,6 +319,43 @@ julia_standalone_binary(
 <tr><td style="text-align: left"><a id="julia_standalone_binary-precompile_statements"></a>precompile_statements</td><td style="text-align: left">Files of precompile statements (as produced by <code>julia --trace-compile</code>) whose methods are compiled into the system image.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
 </tbody></table>
 </div>
+<p><a id="julia_sysimage"></a></p>
+<h2 id="julia_sysimage"><a class="header" href="#julia_sysimage">julia_sysimage</a></h2>
+<pre>
+load("@rules_julia//julia:defs.bzl", "julia_sysimage")
+
+julia_sysimage(<a href="#julia_sysimage-name">name</a>, <a href="#julia_sysimage-deps">deps</a>, <a href="#julia_sysimage-cpu_target">cpu_target</a>, <a href="#julia_sysimage-precompile_statements">precompile_statements</a>)
+</pre>
+<p>Compile Julia packages and their dependencies into a system image.</p>
+<p>A system image is Julia's own ahead-of-time format: the shared library that
+<code>julia --sysimage</code> loads in place of the stock one, with every included module
+already compiled. The image is produced in two actions: <code>julia --output-o</code>
+emits the object archive, which is then linked into a shared library. By
+default the link uses the <code>lld</code> bundled with Julia, the same way Julia links
+its own package images; <code>--@rules_julia//julia/settings:linker=cc</code> selects the
+C++ toolchain instead. No network access or host tools outside the Bazel
+toolchains are involved, and the image is rebuilt only when its inputs change.</p>
+<p>Every target in <code>deps</code> must be a Julia package: its entry point is
+<code>src/&lt;name&gt;.jl</code> defining <code>module &lt;name&gt;</code>. The output is the shared library;
+the object archive is available in the <code>archive</code> output group. For a
+self-contained executable around a package with a <code>julia_main</code> function, see
+<code>julia_standalone_binary</code>, which builds on the same actions.</p>
+<p>Example:</p>
+<pre><code class="language-python">julia_sysimage(
+    name = "image",
+    deps = ["@deps//:JSON", "//my/lib"],
+)
+</code></pre>
+<pre><code class="language-sh">julia --sysimage=$(bazel cquery --output=files //:image) -e 'using JSON'
+</code></pre>
+<p><strong>ATTRIBUTES</strong></p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><a id="julia_sysimage-name"></a>name</td><td style="text-align: left">A unique name for this target.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels#target-names">Name</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_sysimage-deps"></a>deps</td><td style="text-align: left">The packages to compile into the image.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
+<tr><td style="text-align: left"><a id="julia_sysimage-cpu_target"></a>cpu_target</td><td style="text-align: left">The <code>--cpu-target</code> to compile the system image for. Defaults to the toolchain's portable multi-versioned target for its architecture.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>""</code></td></tr>
+<tr><td style="text-align: left"><a id="julia_sysimage-precompile_statements"></a>precompile_statements</td><td style="text-align: left">Files of precompile statements (as produced by <code>julia --trace-compile</code>) whose methods are compiled into the system image.</td><td style="text-align: left"><a href="https://bazel.build/concepts/labels">List of labels</a></td><td style="text-align: left">optional</td><td style="text-align: left"><code>[]</code></td></tr>
+</tbody></table>
+</div>
 <p><a id="julia_test"></a></p>
 <h2 id="julia_test"><a class="header" href="#julia_test">julia_test</a></h2>
 <pre>
@@ -369,23 +403,7 @@ julia_format_aspect()
 <p>An aspect for running JuliaFormatter on targets with Julia sources.</p>
 <p><strong>ASPECT ATTRIBUTES</strong></p>
 <p><strong>ATTRIBUTES</strong></p>
-<p><a id="julia"></a></p>
-<h2 id="julia"><a class="header" href="#julia">julia</a></h2>
-<pre>
-julia = use_extension("@rules_julia//julia:defs.bzl", "julia")
-julia.toolchain(<a href="#julia.toolchain-linker">linker</a>, <a href="#julia.toolchain-version">version</a>)
-</pre>
-<p>Bzlmod extensions for Julia</p>
-<p><strong>TAG CLASSES</strong></p>
-<p><a id="julia.toolchain"></a></p>
-<h3 id="toolchain"><a class="header" href="#toolchain">toolchain</a></h3>
-<p>Request that a Julia version be made available via <code>@julia_toolchains</code>.</p>
-<p><strong>Attributes</strong></p>
-<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Name</th><th style="text-align: left">Description</th><th style="text-align: left">Type</th><th style="text-align: left">Mandatory</th><th style="text-align: left">Default</th></tr></thead><tbody>
-<tr><td style="text-align: left"><a id="julia.toolchain-linker"></a>linker</td><td style="text-align: left">The default linker for system images built with this version: <code>julia</code> (the <code>lld</code> bundled with Julia) or <code>cc</code> (the C++ toolchain). Can be overridden with <code>--@rules_julia//julia/settings:linker</code>.</td><td style="text-align: left">String</td><td style="text-align: left">optional</td><td style="text-align: left"><code>"julia"</code></td></tr>
-<tr><td style="text-align: left"><a id="julia.toolchain-version"></a>version</td><td style="text-align: left">A Julia version (e.g. <code>1.12.5</code>). Select it with <code>--@rules_julia//julia/settings:version</code>.</td><td style="text-align: left">String</td><td style="text-align: left">required</td><td style="text-align: left"></td></tr>
-</tbody></table>
-</div>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
@@ -394,7 +412,7 @@ julia.toolchain(<a href="#julia.toolchain-linker">linker</a>, <a href="#julia.to
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="settings.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="extensions.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -408,7 +426,7 @@ julia.toolchain(<a href="#julia.toolchain-linker">linker</a>, <a href="#julia.to
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="settings.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="extensions.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
