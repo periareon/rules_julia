@@ -72,7 +72,8 @@ def _julia_format_aspect_impl(target, ctx):
     if JuliaInfo not in target:
         return []
 
-    toolchain_info = ctx.toolchains[julia_common.TOOLCHAIN_TYPE]
+    # The formatter runs on the execution platform; gate on that Julia.
+    toolchain_info = ctx.attr._julia_toolchain_exec[platform_common.ToolchainInfo]
     if not julia_common.version_gte(toolchain_info.version, "1.11.0"):
         return []
 
@@ -113,6 +114,11 @@ julia_format_aspect = aspect(
             allow_single_file = True,
             default = Label("//julia/settings:formatter_config"),
         ),
+        "_julia_toolchain_exec": attr.label(
+            cfg = "exec",
+            default = Label("//julia:current_julia_toolchain"),
+            providers = [platform_common.ToolchainInfo],
+        ),
         "_runner": attr.label(
             doc = "The process wrapper for running JuliaFormatter.",
             cfg = "exec",
@@ -121,7 +127,6 @@ julia_format_aspect = aspect(
         ),
     },
     required_providers = [JuliaInfo],
-    toolchains = [julia_common.TOOLCHAIN_TYPE],
 )
 
 def _julia_format_test_impl(ctx):

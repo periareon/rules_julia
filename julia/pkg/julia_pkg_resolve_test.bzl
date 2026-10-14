@@ -15,7 +15,7 @@ def _julia_pkg_resolve_test_impl(ctx):
     runtime_files = []
     entries = []
     for entry in resolver_info.manifests:
-        runtime_files.append(entry.runtime.files)
+        runtime_files.append(entry.runtime.all_files)
         entries.append("|".join([
             entry.version,
             julia_common.rlocationpath(entry.file, workspace_name),

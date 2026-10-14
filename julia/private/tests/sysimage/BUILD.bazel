@@ -1,0 +1,35 @@
+load("//julia:julia_library.bzl", "julia_library")
+load("//julia:julia_sysimage.bzl", "julia_sysimage")
+load("//julia:julia_test.bzl", "julia_test")
+
+julia_library(
+    name = "greeter",
+    srcs = ["src/greeter.jl"],
+)
+
+julia_library(
+    name = "farewell",
+    srcs = ["src/farewell.jl"],
+    deps = [":greeter"],
+)
+
+# An image holding several packages and their dependencies.
+julia_sysimage(
+    name = "image",
+    deps = [
+        ":farewell",
+        ":greeter",
+    ],
+)
+
+julia_test(
+    name = "sysimage_test",
+    srcs = ["sysimage_test.jl"],
+    data = [":image"],
+    env = {"RULES_JULIA_SYSIMAGE": "$(rlocationpath :image)"},
+    deps = [
+        ":farewell",
+        ":greeter",
+        "//julia/runfiles",
+    ],
+)

@@ -1,7 +1,7 @@
 # rules_julia system image driver
 #
 # Runs inside `julia --output-o` to produce the object archive for a system
-# image containing a package and its dependencies. Modeled on Julia's own
+# image containing packages and their dependencies. Modeled on Julia's own
 # `juliac-buildscript.jl` and PackageCompiler's sysimage script: the package
 # is loaded from a runfiles-shaped tree, precompile statements are executed,
 # and all build-time state is cleared before the image is serialized.
@@ -59,12 +59,13 @@ end
 function main()
     flags = parse_flags(
         ARGS;
-        scalars = ["--config", "--manifest", "--package"],
-        lists = ["--precompile-statements"],
+        scalars = ["--config", "--manifest"],
+        lists = ["--package", "--precompile-statements"],
     )
     config = require_flag(flags, "--config")
     manifest = require_flag(flags, "--manifest")
-    package = require_flag(flags, "--package")
+    packages = flags["--package"]
+    isempty(packages) && error("At least one --package is required")
     statements = abspath.(flags["--precompile-statements"])
 
     includes, depots, _ = read_config(config)
@@ -88,19 +89,24 @@ function main()
     # custom one, so anything the runtime needs must be in the image itself.
     Base.require(Main, :TOML)
 
-    Base.require(Main, Symbol(package))
+    for package in packages
+        Base.require(Main, Symbol(package))
+    end
 
-    return package, statements
+    return packages, statements
 end
 
-const PACKAGE, PRECOMPILE_STATEMENTS = main()
+const PACKAGES, PRECOMPILE_STATEMENTS = main()
 
-# Bind the package in `Main` so the entry point can be reached as
+# Bind the packages in `Main` so entry points can be reached as
 # `Main.<package>` once the image is in use. This happens at top level so the
-# new binding is visible to the code below without a world age bump.
-Core.eval(Main, Meta.parse("import $PACKAGE"))
+# new bindings are visible to the code below without a world age bump.
+for package in PACKAGES
+    Core.eval(Main, Meta.parse("import $package"))
+end
 
-let mod = getfield(Main, Symbol(PACKAGE))
+for package in PACKAGES
+    mod = getfield(Main, Symbol(package))
     if isdefined(mod, :julia_main)
         precompile(Tuple{typeof(getfield(mod, :julia_main))})
     end
