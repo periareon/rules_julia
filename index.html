@@ -175,6 +175,15 @@ available, request them and select one with the <code>version</code> setting:</p
 </code></pre>
 <pre><code class="language-text">bazel build --@rules_julia//julia/settings:version=1.11.9 //...
 </code></pre>
+<h3 id="compilation-mode"><a class="header" href="#compilation-mode">Compilation mode</a></h3>
+<p>Optimization level, bounds checking and debug info follow <code>--compilation_mode</code>
+through the toolchain's <code>opt_level</code>, <code>check_bounds</code> and <code>debug_info</code>
+attributes, and apply uniformly to precompilation, system images and the
+binaries that load them, since Julia rejects compile caches built with other
+values. By default <code>fastbuild</code> and <code>opt</code> use Julia's own defaults, which also
+match the standard library caches Julia ships, and <code>dbg</code> builds with <code>-O0</code>,
+<code>--check-bounds=yes</code> and <code>-g2</code>. Per-target <code>julia_flags</code> carry everything
+else, such as <code>--threads</code>.</p>
 <h2 id="package-layout"><a class="header" href="#package-layout">Package layout</a></h2>
 <p>Targets follow Julia's conventions. A <code>julia_library</code> named <code>Foo</code> is loaded
 with <code>using Foo</code> from <code>src/Foo.jl</code> (or <code>Foo.jl</code> next to the <code>BUILD.bazel</code>
@@ -286,17 +295,18 @@ Bazel's standard incompatibility message when built explicitly.</p>
 cross compilation environment that cannot be reproduced in a Bazel action, so
 the published tarballs are consumed as-is, pinned by the SHA-256 and git tree
 hash recorded in each package's <code>Artifacts.toml</code>.</p>
-<p>The <code>pkg</code> extension defines a repository per artifact variant and selects one
-for the target platform at analysis time, so only the variant in use is ever
-downloaded. Operating system and CPU come from the target platform. The
-remaining ABI tags Julia uses to pick a variant are flags that default to what
-official Julia binaries are built with:</p>
-<div class="table-wrapper"><table><thead><tr><th>Flag</th><th>Values</th><th>Default</th></tr></thead><tbody>
-<tr><td><code>@rules_julia//julia/settings:libc</code></td><td><code>glibc</code>, <code>musl</code></td><td><code>glibc</code></td></tr>
-<tr><td><code>@rules_julia//julia/settings:libgfortran_version</code></td><td><code>3</code>, <code>4</code>, <code>5</code></td><td><code>5</code></td></tr>
-<tr><td><code>@rules_julia//julia/settings:cxxstring_abi</code></td><td><code>cxx03</code>, <code>cxx11</code></td><td><code>cxx11</code></td></tr>
-</tbody></table>
-</div>
+<p>The <code>pkg</code> extension defines a repository per artifact variant and chooses in
+two steps, so only relevant variants are ever downloaded. Operating system and
+CPU come from the target platform and are decided by <code>select()</code>. The remaining
+tags, the <code>libgfortran</code> ABI and the C++ <code>std::string</code> ABI, describe the
+runtimes bundled with the Julia distribution rather than the machine, so they
+are decided against the resolved toolchain's <code>libgfortran_version</code> and
+<code>cxxstring_abi</code> attributes, which default to what official Julia binaries
+ship. Users pick a platform and a Julia version; nothing else needs setting.</p>
+<p>On Linux the C library is assumed to be glibc, which is what official Julia
+binaries are built against; musl variants are not selected. This will follow
+the libc constraint from <code>platforms_contrib</code> once it is available. Artifacts
+for other operating systems carry no libc tag.</p>
 <p>Variants that differ only in tags the rules do not model (for example
 <code>libstdcxx_version</code>) resolve to the newest one, matching what <code>Pkg</code> picks on a
 current Julia. A package whose artifact has no variant for the target platform
