@@ -18,6 +18,7 @@ julia_artifact_import(
         allow_empty = True,
     ),
     artifact_name = "{artifact}",
+    platform_tags = {platform_tags},
     tree_hash = "{tree_hash}",
     visibility = ["//visibility:public"],
 )
@@ -42,6 +43,7 @@ def _julia_artifact_repository_impl(repository_ctx):
     repository_ctx.file("BUILD.bazel", _BUILD_FILE.format(
         artifact = attrs.artifact_name,
         package = attrs.package,
+        platform_tags = json.encode_indent(attrs.platform_tags, indent = " " * 4).replace("\n", "\n    "),
         tree_hash = attrs.tree_hash,
     ))
 
@@ -58,6 +60,10 @@ julia_artifact_repository = repository_rule(
         "package": attr.string(
             doc = "The package the artifact belongs to; used in messages.",
             mandatory = True,
+        ),
+        "platform_tags": attr.string_dict(
+            doc = "The variant's ABI tags, matched against the toolchain at analysis time.",
+            default = {},
         ),
         "sha256": attr.string(
             doc = "The expected SHA-256 of the tarball.",

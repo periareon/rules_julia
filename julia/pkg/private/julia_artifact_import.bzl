@@ -1,6 +1,6 @@
 """The `julia_artifact_import` rule."""
 
-load("//julia/private:providers.bzl", "JuliaInfo")
+load("//julia/private:providers.bzl", "JuliaArtifactVariantInfo", "JuliaInfo")
 
 def _julia_artifact_import_impl(ctx):
     # The repository root doubles as a depot: files live under
@@ -16,6 +16,10 @@ def _julia_artifact_import_impl(ctx):
         DefaultInfo(
             files = files,
             runfiles = runfiles,
+        ),
+        JuliaArtifactVariantInfo(
+            artifact_name = ctx.attr.artifact_name,
+            tags = ctx.attr.platform_tags,
         ),
         JuliaInfo(
             app_name = ctx.attr.artifact_name,
@@ -44,6 +48,14 @@ JLL packages find the files at build and run time.
             doc = "The name of the artifact in `Artifacts.toml`.",
             mandatory = True,
         ),
+        "platform_tags": attr.string_dict(
+            doc = (
+                "ABI tags of this variant (`libgfortran_version` as a major version, `cxxstring_abi`). " +
+                "When several variants of one artifact are dependencies of a target, the one matching " +
+                "the Julia toolchain's ABI is used and the others are dropped."
+            ),
+            default = {},
+        ),
         "srcs": attr.label_list(
             doc = "All files of the artifact, under `artifacts/<tree_hash>/`.",
             allow_files = True,
@@ -53,5 +65,5 @@ JLL packages find the files at build and run time.
             mandatory = True,
         ),
     },
-    provides = [JuliaInfo],
+    provides = [JuliaArtifactVariantInfo, JuliaInfo],
 )

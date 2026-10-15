@@ -1,7 +1,7 @@
 """Bazel tools for interfacing with Julia packages"""
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("//julia/private:platforms.bzl", "choose_variants", "config_setting_text")
+load("//julia/private:platforms.bzl", "abi_suffix", "abi_tags", "choose_variants", "config_setting_text")
 load("//julia/settings:settings.bzl", "julia_minor_version", "julia_minor_versions")
 load(":artifact_repository.bzl", "julia_artifact_repository")
 load(":artifacts_toml.bzl", "parse_artifacts_toml")
@@ -28,12 +28,16 @@ ARTIFACTS = {artifact_deps}
 # The Julia minor version the manifest was resolved for, if any.
 COMPATIBLE_WITH = {compatible_with}
 
+# Packages conventionally keep auxiliary code and generated files under
+# `deps/` and include them from `src/` (e.g. `include("../deps/deps.jl")`),
+# so that directory is shipped alongside the sources.
 julia_library(
     name = "{name}",
     srcs = glob(
         include = [
             "src/**/*.jl",
             "ext/**/*.jl",
+            "deps/**/*.jl",
         ],
         allow_empty = True,
     ),
@@ -42,6 +46,7 @@ julia_library(
             "*.toml",
             "src/**",
             "ext/**",
+            "deps/**",
         ],
         exclude = [
             # A committed manifest would override dependency resolution.
@@ -49,6 +54,7 @@ julia_library(
             "JuliaManifest.toml",
             "src/**/*.jl",
             "ext/**/*.jl",
+            "deps/**/*.jl",
         ],
         allow_empty = True,
     ),
@@ -376,47 +382,55 @@ def _artifact_repositories(*, hub, prefix, package, artifacts, pkg_server, confi
         # fetched like any other where a variant exists and omitted
         # elsewhere, deferring the failure to the point of use as Julia does.
         lazy = any([variant["lazy"] for variant in variants])
+
+        # Platform (os, arch) is decided by `select()`; every ABI variant for
+        # that platform is listed and the consuming rule keeps the one matching
+        # the toolchain's `libgfortran_version` and `cxxstring_abi`.
         branches = {}
         available = []
         for key_name, selection in choice.selected.items():
-            variant = selection.variant
-            if not variant["sha256"]:
-                fail("Artifact `{}` of package `{}` has no sha256 for platform {}".format(
-                    artifact_name,
-                    package,
-                    variant["tags"],
-                ))
-            suffix = key_name[len("platform__"):] if key_name else "any"
-            repo_name = "{}__{}__{}__{}".format(prefix, package, _sanitize(artifact_name), suffix)
-            julia_artifact_repository(
-                name = repo_name,
-                artifact_name = artifact_name,
-                package = package,
-                sha256 = variant["sha256"],
-                tree_hash = variant["tree_hash"],
-                urls = variant["urls"] + ["{}/artifact/{}".format(pkg_server.rstrip("/"), variant["tree_hash"])],
-            )
-            label = "@{}//:artifact".format(repo_name)
+            labels = []
+            platform_suffix = key_name[len("platform__"):] if key_name else "any"
+            for variant in selection.variants:
+                if not variant["sha256"]:
+                    fail("Artifact `{}` of package `{}` has no sha256 for platform {}".format(
+                        artifact_name,
+                        package,
+                        variant["tags"],
+                    ))
+                suffix = platform_suffix
+                abi = abi_suffix(variant["tags"])
+                if abi != "any":
+                    suffix = "{}_{}".format(platform_suffix, abi)
+                repo_name = "{}__{}__{}__{}".format(prefix, package, _sanitize(artifact_name), suffix)
+                julia_artifact_repository(
+                    name = repo_name,
+                    artifact_name = artifact_name,
+                    package = package,
+                    platform_tags = abi_tags(variant["tags"]),
+                    sha256 = variant["sha256"],
+                    tree_hash = variant["tree_hash"],
+                    urls = variant["urls"] + ["{}/artifact/{}".format(pkg_server.rstrip("/"), variant["tree_hash"])],
+                )
+                labels.append("@{}//:artifact".format(repo_name))
             if key_name:
                 config_settings.setdefault(key_name, config_setting_text(selection.key))
-                branches["@{}//:{}".format(hub, key_name)] = label
-                available.append(suffix)
+                branches["@{}//:{}".format(hub, key_name)] = labels
+                available.append(platform_suffix)
             else:
-                unconditional.append(label)
+                unconditional.extend(labels)
 
         if branches:
             lines = ["select({"]
             for condition in sorted(branches.keys()):
-                lines.append("        \"{}\": [\"{}\"],".format(condition, branches[condition]))
+                lines.append("        \"{}\": [{}],".format(condition, ", ".join(["\"{}\"".format(label) for label in branches[condition]])))
             if lazy:
                 lines.append("        \"//conditions:default\": [],")
                 lines.append("    })")
             else:
                 message = (
                     "No `{}` artifact of `{}` is available for the target platform. " +
-                    "Available platforms: {}. Check the `@rules_julia//julia/settings` " +
-                    "`libc`, `libgfortran_version` and `cxxstring_abi` flags if the " +
-                    "platform looks right."
+                    "Available platforms: {}."
                 ).format(
                     artifact_name,
                     package,

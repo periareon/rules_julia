@@ -30,6 +30,17 @@ julia.toolchain(version = "1.11.9")
 bazel build --@rules_julia//julia/settings:version=1.11.9 //...
 ```
 
+### Compilation mode
+
+Optimization level, bounds checking and debug info follow `--compilation_mode`
+through the toolchain's `opt_level`, `check_bounds` and `debug_info`
+attributes, and apply uniformly to precompilation, system images and the
+binaries that load them, since Julia rejects compile caches built with other
+values. By default `fastbuild` and `opt` use Julia's own defaults, which also
+match the standard library caches Julia ships, and `dbg` builds with `-O0`,
+`--check-bounds=yes` and `-g2`. Per-target `julia_flags` carry everything
+else, such as `--threads`.
+
 ## Package layout
 
 Targets follow Julia's conventions. A `julia_library` named `Foo` is loaded
@@ -175,17 +186,19 @@ cross compilation environment that cannot be reproduced in a Bazel action, so
 the published tarballs are consumed as-is, pinned by the SHA-256 and git tree
 hash recorded in each package's `Artifacts.toml`.
 
-The `pkg` extension defines a repository per artifact variant and selects one
-for the target platform at analysis time, so only the variant in use is ever
-downloaded. Operating system and CPU come from the target platform. The
-remaining ABI tags Julia uses to pick a variant are flags that default to what
-official Julia binaries are built with:
+The `pkg` extension defines a repository per artifact variant and chooses in
+two steps, so only relevant variants are ever downloaded. Operating system and
+CPU come from the target platform and are decided by `select()`. The remaining
+tags, the `libgfortran` ABI and the C++ `std::string` ABI, describe the
+runtimes bundled with the Julia distribution rather than the machine, so they
+are decided against the resolved toolchain's `libgfortran_version` and
+`cxxstring_abi` attributes, which default to what official Julia binaries
+ship. Users pick a platform and a Julia version; nothing else needs setting.
 
-| Flag | Values | Default |
-|---|---|---|
-| `@rules_julia//julia/settings:libc` | `glibc`, `musl` | `glibc` |
-| `@rules_julia//julia/settings:libgfortran_version` | `3`, `4`, `5` | `5` |
-| `@rules_julia//julia/settings:cxxstring_abi` | `cxx03`, `cxx11` | `cxx11` |
+On Linux the C library is assumed to be glibc, which is what official Julia
+binaries are built against; musl variants are not selected. This will follow
+the libc constraint from `platforms_contrib` once it is available. Artifacts
+for other operating systems carry no libc tag.
 
 Variants that differ only in tags the rules do not model (for example
 `libstdcxx_version`) resolve to the newest one, matching what `Pkg` picks on a

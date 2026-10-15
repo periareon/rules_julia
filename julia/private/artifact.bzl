@@ -1,8 +1,7 @@
 """julia_artifact"""
 
-load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load(":julia_common.bzl", "DRIVER_ATTRS", "julia_common")
-load(":platforms.bzl", "ARCH_CONSTRAINTS", "OS_CONSTRAINTS")
+load(":platforms.bzl", "ARCH_CONSTRAINTS", "ASSUMED_LINUX_LIBC", "OS_CONSTRAINTS")
 
 JuliaArtifactInfo = provider(
     doc = "A Julia artifact tarball and the `Artifacts.toml` entry describing it.",
@@ -49,15 +48,19 @@ def _platform_tags(ctx):
         tags["arch"] = _constraint_tag(ctx, ARCH_CONSTRAINTS.keys(), ctx.attr._arch_constraints, "arch")
 
     # Only Linux platforms carry a `libc` tag in Julia; elsewhere it is dropped
-    # so the entry matches what `HostPlatform()` reports there.
+    # so the entry matches what `HostPlatform()` reports there. See
+    # `ASSUMED_LINUX_LIBC` for why this is not configurable yet.
     if "libc" in requested and os == "linux":
-        tags["libc"] = ctx.attr._libc[BuildSettingInfo].value
+        tags["libc"] = ASSUMED_LINUX_LIBC
 
-    # Julia writes the full version even though only the major matters.
+    # The ABI tags describe the runtimes bundled with the Julia that will load
+    # the artifact, i.e. the target configuration's toolchain. Julia writes
+    # the full `libgfortran` version even though only the major matters.
+    toolchain_info = ctx.attr._julia_toolchain[platform_common.ToolchainInfo]
     if "libgfortran_version" in requested:
-        tags["libgfortran_version"] = ctx.attr._libgfortran_version[BuildSettingInfo].value + ".0.0"
+        tags["libgfortran_version"] = toolchain_info.libgfortran_version + ".0.0"
     if "cxxstring_abi" in requested:
-        tags["cxxstring_abi"] = ctx.attr._cxxstring_abi[BuildSettingInfo].value
+        tags["cxxstring_abi"] = toolchain_info.cxxstring_abi
     return tags
 
 def _repo_relative(file):
@@ -203,7 +206,7 @@ below it); `files` places outputs from anywhere at an explicit path. Directories
 
 Platform specific artifacts set `platform_tags`. The values are taken from the
 target platform (`os`, `arch`) and the `@rules_julia//julia/settings` flags
-(`libc`, `libgfortran_version`, `cxxstring_abi`), so building the same target
+(`libgfortran_version` and `cxxstring_abi` from the toolchain; `libc` is assumed glibc on Linux), so building the same target
 under several `--platforms` yields one entry per platform, ready to be
 concatenated. Platform independent artifacts (data, models, ...) leave it empty.
 
@@ -274,24 +277,20 @@ os = "linux"
         "_arch_constraints": attr.label_list(
             default = [Label(label) for label in ARCH_CONSTRAINTS.values()],
         ),
-        "_cxxstring_abi": attr.label(
-            default = Label("//julia/settings:cxxstring_abi"),
-        ),
         "_driver": attr.label(
             default = Label("//julia/private:artifact.jl"),
             allow_single_file = True,
+        ),
+        "_julia_toolchain": attr.label(
+            doc = "The Julia toolchain of the target platform, whose bundled runtimes the ABI tags describe.",
+            default = Label("//julia:current_julia_toolchain"),
+            providers = [platform_common.ToolchainInfo],
         ),
         "_julia_toolchain_exec": attr.label(
             doc = "The Julia toolchain of the execution platform, which runs the packing step.",
             cfg = "exec",
             default = Label("//julia:current_julia_toolchain"),
             providers = [platform_common.ToolchainInfo],
-        ),
-        "_libc": attr.label(
-            default = Label("//julia/settings:libc"),
-        ),
-        "_libgfortran_version": attr.label(
-            default = Label("//julia/settings:libgfortran_version"),
         ),
         "_os_constraints": attr.label_list(
             default = [Label(label) for label in OS_CONSTRAINTS.values()],

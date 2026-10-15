@@ -10,7 +10,8 @@ def _julia_library_impl(ctx):
     Collects source files and propagates information to binaries/tests.
     """
     srcs = depset(ctx.files.srcs)
-    deps = ctx.attr.deps
+    toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
+    deps = julia_common.select_artifacts(ctx, ctx.attr.deps, toolchain_info)
     data = ctx.files.data
 
     transitive_srcs = depset(
@@ -36,7 +37,6 @@ def _julia_library_impl(ctx):
     artifact_depots = julia_common.collect_artifact_depots(deps)
     depots = dep_depots
     if _is_precompilable(ctx, layout):
-        toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
         depot = julia_common.precompile(
             ctx,
             name = ctx.label.name,
@@ -134,6 +134,7 @@ def _julia_binary_impl(ctx):
         data_targets = ctx.attr.data,
         env = env,
         main = ctx.file.main if hasattr(ctx.attr, "main") and ctx.attr.main else None,
+        julia_flags = ctx.attr.julia_flags,
     )
 
 julia_binary = rule(
@@ -150,6 +151,16 @@ julia_binary = rule(
         ),
         "env": attr.string_dict(
             doc = "Environment variables to set when running the binary. Supports $(location) expansion.",
+        ),
+        "julia_flags": attr.string_list(
+            doc = (
+                "Flags for the `julia` interpreter itself, such as `--color=yes` or `--threads=auto`; " +
+                "program arguments go in `args`. Flags that affect code generation (`-O`, " +
+                "`--check-bounds`, `-g`) are rejected here because build-time compile caches must be " +
+                "built with the same values: they follow `--compilation_mode` through the toolchain's " +
+                "`opt_level`, `check_bounds` and `debug_info` attributes instead. " +
+                "Flags the rules manage (`--compiled-modules`, `--sysimage`, `--project`) are rejected too."
+            ),
         ),
         "main": attr.label(
             doc = "The main entrypoint file. If not specified, defaults to the only file in srcs, or a file matching the target name.",
@@ -180,6 +191,7 @@ def _julia_test_impl(ctx):
         data_targets = ctx.attr.data,
         env = env,
         main = ctx.file.main,
+        julia_flags = ctx.attr.julia_flags,
     )
 
 julia_test = rule(
@@ -196,6 +208,16 @@ julia_test = rule(
         ),
         "env": attr.string_dict(
             doc = "Environment variables to set when running the test. Supports $(location) expansion.",
+        ),
+        "julia_flags": attr.string_list(
+            doc = (
+                "Flags for the `julia` interpreter itself, such as `--color=yes` or `--threads=auto`; " +
+                "program arguments go in `args`. Flags that affect code generation (`-O`, " +
+                "`--check-bounds`, `-g`) are rejected here because build-time compile caches must be " +
+                "built with the same values: they follow `--compilation_mode` through the toolchain's " +
+                "`opt_level`, `check_bounds` and `debug_info` attributes instead. " +
+                "Flags the rules manage (`--compiled-modules`, `--sysimage`, `--project`) are rejected too."
+            ),
         ),
         "main": attr.label(
             doc = "The main test entrypoint file. If not specified, defaults to the only file in srcs, or a file matching the target name.",
