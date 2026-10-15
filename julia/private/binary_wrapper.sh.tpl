@@ -74,10 +74,14 @@ if [ -n "${SYSIMAGE}" ]; then
     SYSIMAGE_FLAGS=("--sysimage=$(rlocation "${SYSIMAGE}")")
 fi
 
+# Flags for the interpreter itself: code generation settings, then `julia_flags`.
+JULIA_FLAGS=({julia_flags})
+
 # Execute Julia with the entrypoint
 exec \
     "${INTERPRETER}" \
     ${SYSIMAGE_FLAGS[@]+"${SYSIMAGE_FLAGS[@]}"} \
+    ${JULIA_FLAGS[@]+"${JULIA_FLAGS[@]}"} \
     --compiled-modules="${COMPILED_MODULES}" \
     "${ENTRYPOINT}" \
     "${CONFIG}" \

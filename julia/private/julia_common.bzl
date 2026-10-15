@@ -1,7 +1,8 @@
 """Common utilities for Julia rules."""
 
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
-load(":providers.bzl", "JuliaInfo")
+load(":platforms.bzl", "select_abi_variant")
+load(":providers.bzl", "JuliaArtifactVariantInfo", "JuliaInfo")
 load(":rlocation.bzl", "rlocationpath")
 load(":toolchain.bzl", "TOOLCHAIN_TYPE")
 
@@ -45,6 +46,56 @@ def _compute_main(owner, srcs, main = None):
         ))
 
     return main_candidate
+
+def _toolchain_abi(toolchain_info):
+    return {
+        "cxxstring_abi": toolchain_info.cxxstring_abi,
+        "libgfortran_version": toolchain_info.libgfortran_version,
+    }
+
+def _select_artifacts(ctx, deps, toolchain_info):
+    """Keep, per artifact, the dependency variant matching the toolchain's ABI.
+
+    Prebuilt artifacts with Fortran or C++ code come in several variants that
+    differ only in the runtime ABI they were built against. Generated package
+    targets list every variant for the target platform; this keeps the one
+    compatible with the runtimes bundled in the resolved Julia and drops the
+    others.
+
+    Args:
+        ctx: Rule context.
+        deps (list[Target]): Dependencies.
+        toolchain_info (ToolchainInfo): The Julia toolchain.
+
+    Returns:
+        list[Target]: `deps` with non-matching artifact variants removed.
+    """
+    by_artifact = {}
+    for dep in deps:
+        if JuliaArtifactVariantInfo in dep:
+            info = dep[JuliaArtifactVariantInfo]
+            by_artifact.setdefault(info.artifact_name, []).append(struct(tags = info.tags, value = dep))
+
+    if not by_artifact:
+        return deps
+
+    abi = _toolchain_abi(toolchain_info)
+    keep = {}
+    for artifact_name, candidates in by_artifact.items():
+        chosen = select_abi_variant(candidates, abi)
+        if chosen == None:
+            fail((
+                "{}: no variant of artifact `{}` matches the Julia toolchain's ABI {} " +
+                "(available: {}). Set `libgfortran_version` / `cxxstring_abi` on the toolchain " +
+                "to what its bundled runtimes use."
+            ).format(ctx.label, artifact_name, abi, [candidate.tags for candidate in candidates]))
+        keep[chosen.value.label] = True
+
+    return [
+        dep
+        for dep in deps
+        if JuliaArtifactVariantInfo not in dep or dep.label in keep
+    ]
 
 def _collect_transitive_srcs(deps):
     """Collect all transitive source files from dependencies.
@@ -235,7 +286,64 @@ def _create_config_file(ctx, includes, runfiles, depots, name = None, artifact_d
 
     return config
 
-def _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage = None):
+# Flags that `julia_flags` may not carry, with the reason. Flags affecting
+# code generation must match between build-time compile caches and the
+# binary, so they are build settings; the rest are managed by the rules.
+_RESERVED_JULIA_FLAGS = {
+    "--check-bounds": "follows `--compilation_mode` via the toolchain's `check_bounds`, so precompile caches match",
+    "--compiled-modules": "managed by the rules (override at run time with `RULES_JULIA_COMPILED_MODULES`)",
+    "--cpu-target": "managed by the toolchain (`cpu_target` on system image rules)",
+    "--debug-info": "follows `--compilation_mode` via the toolchain's `debug_info`, so precompile caches match",
+    "--inline": "code generation flags must apply to precompile caches too; not configurable yet",
+    "--optimize": "follows `--compilation_mode` via the toolchain's `opt_level`, so precompile caches match",
+    "--pkgimages": "managed by the rules",
+    "--project": "the load path is configured by the rules; use `deps`",
+    "--sysimage": "use the `sysimage` attribute",
+    "-C": "managed by the toolchain (`cpu_target` on system image rules)",
+    "-J": "use the `sysimage` attribute",
+    "-O": "follows `--compilation_mode` via the toolchain's `opt_level`, so precompile caches match",
+    "-g": "follows `--compilation_mode` via the toolchain's `debug_info`, so precompile caches match",
+}
+
+def _validate_julia_flags(owner, flags):
+    """Reject flags in `julia_flags` that the rules manage or that affect compile caches.
+
+    Args:
+        owner (Label): The target declaring the flags.
+        flags (list[str]): The flags.
+    """
+    for flag in flags:
+        name = flag.split("=")[0]
+        for reserved, reason in _RESERVED_JULIA_FLAGS.items():
+            # Short flags take their value attached (`-O3`, `-Jsys.so`).
+            if name == reserved or (len(reserved) == 2 and name.startswith(reserved)):
+                fail("{}: `julia_flags` may not contain `{}`: {}.".format(owner, flag, reason))
+
+def _codegen_flags(ctx, toolchain_info):
+    """Interpreter flags for code generation, from the toolchain and `--compilation_mode`.
+
+    Every Julia invocation that compiles or loads caches passes these, so
+    build-time caches and run-time flags always agree.
+
+    Args:
+        ctx: Rule context.
+        toolchain_info (ToolchainInfo): The Julia toolchain.
+
+    Returns:
+        list[str]: `julia` flags.
+    """
+    mode = ctx.var.get("COMPILATION_MODE", "fastbuild")
+    return [
+        "-O" + toolchain_info.opt_level[mode],
+        "--check-bounds=" + toolchain_info.check_bounds[mode],
+        "-g" + toolchain_info.debug_info[mode],
+    ]
+
+def _shell_quote(value):
+    """Quote a string for POSIX shells."""
+    return "'" + value.replace("'", "'\\''") + "'"
+
+def _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage = None, julia_flags = []):
     """Create a wrapper script to run Julia with proper environment.
 
     Args:
@@ -244,6 +352,9 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage = Non
         config: The config file.
         toolchain_info: The Julia toolchain info.
         sysimage (File, optional): A custom system image to start Julia with.
+        julia_flags (list[str], optional): Flags passed to the `julia`
+            interpreter ahead of the entrypoint (e.g. `--color=yes`), after
+            the flags derived from the code generation settings.
 
     Returns:
         File: The wrapper executable.
@@ -266,6 +377,12 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage = Non
     # versions have no such mode and evaluate from source.
     test_compiled_modules = "existing" if _version_gte(toolchain_info.version, "1.11.0") else "no"
 
+    all_flags = _codegen_flags(ctx, toolchain_info) + list(julia_flags)
+    if is_windows:
+        julia_flags_str = " ".join(['"{}"'.format(arg) for arg in all_flags])
+    else:
+        julia_flags_str = " ".join([_shell_quote(arg) for arg in all_flags])
+
     ctx.actions.expand_template(
         template = template_file,
         output = wrapper,
@@ -273,6 +390,7 @@ def _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage = Non
             "{config}": config_rloc,
             "{entrypoint}": entrypoint_rloc,
             "{interpreter}": julia_rloc,
+            "{julia_flags}": julia_flags_str,
             "{main}": main_rloc,
             "{sysimage}": sysimage_rloc,
             "{test_compiled_modules}": test_compiled_modules,
@@ -290,7 +408,8 @@ def _create_julia_binary_impl(
         data_targets,
         env,
         main = None,
-        sysimage = None):
+        sysimage = None,
+        julia_flags = []):
     """Common implementation for julia_binary and julia_test rules.
 
     Args:
@@ -302,6 +421,7 @@ def _create_julia_binary_impl(
         env: Dictionary of environment variables.
         main: Optional main File object.
         sysimage: Optional custom system image File to start Julia with.
+        julia_flags: Optional flags for the `julia` interpreter itself; validated by `validate_julia_flags`.
 
     Returns:
         list: List of providers [JuliaInfo, DefaultInfo, RunEnvironmentInfo].
@@ -311,6 +431,8 @@ def _create_julia_binary_impl(
     if not srcs:
         fail("At least one source is required.")
     main_file = _compute_main(ctx.label, srcs, main)
+    _validate_julia_flags(ctx.label, julia_flags)
+    deps = _select_artifacts(ctx, deps, toolchain_info)
 
     transitive_srcs = depset(
         direct = srcs,
@@ -346,7 +468,7 @@ def _create_julia_binary_impl(
 
     config = _create_config_file(ctx, includes, runfiles, depots, artifact_depots = artifact_depots)
 
-    wrapper = _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage)
+    wrapper = _create_julia_wrapper(ctx, main_file, config, toolchain_info, sysimage, julia_flags)
 
     extra_runfiles = [config, ctx.file._entrypoint, ctx.file._rules_julia_common]
     if sysimage:
@@ -497,7 +619,7 @@ def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, ar
         inputs = depset([config, manifest], transitive = [runfiles.files]),
         outputs = [depot],
         mnemonic = "JuliaPrecompile",
-        julia_flags = ["--compiled-modules=yes", "--pkgimages=yes"],
+        julia_flags = ["--compiled-modules=yes", "--pkgimages=yes"] + _codegen_flags(ctx, toolchain_info),
     )
 
     return depot
@@ -529,6 +651,7 @@ julia_common = struct(
     collect_transitive_srcs = _collect_transitive_srcs,
     collect_includes = _collect_includes,
     collect_depots = _collect_depots,
+    select_artifacts = _select_artifacts,
     collect_artifact_depots = _collect_artifact_depots,
     package_layout = _package_layout,
     precompile = _precompile,
@@ -539,6 +662,7 @@ julia_common = struct(
     create_julia_wrapper = _create_julia_wrapper,
     create_julia_binary_impl = _create_julia_binary_impl,
     BINARY_ATTRS = BINARY_ATTRS,
+    codegen_flags = _codegen_flags,
     DRIVER_ATTRS = DRIVER_ATTRS,
     TOOLCHAIN_TYPE = TOOLCHAIN_TYPE,
 )

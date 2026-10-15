@@ -36,7 +36,7 @@ fmt_deps.from_manifest(
 fmt_deps.pkg_annotation(
     dep = "Preferences",
     patch_args = ["-p1"],
-    patches = ["@//julia/private/format/3rdparty/patches:Preferences.patch"],
+    patches = ["//julia/private/format/3rdparty/patches:Preferences.patch"],
 )
 use_repo(
     fmt_deps,

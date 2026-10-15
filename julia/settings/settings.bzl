@@ -90,39 +90,3 @@ def version(name = "version"):
                 if julia_minor_version(ver) == minor
             ],
         )
-
-def libc(name = "libc"):
-    """The C library Julia artifacts are selected for on Linux.
-
-    Official Julia binaries are built against glibc. Set this to `musl` when
-    using a musl based Julia.
-    """
-    string_flag(
-        name = name,
-        values = ["glibc", "musl"],
-        build_setting_default = "glibc",
-    )
-
-def libgfortran_version(name = "libgfortran_version"):
-    """The major version of `libgfortran` Julia artifacts are selected for.
-
-    Artifacts with Fortran code are published per `libgfortran` ABI. Official
-    Julia binaries bundle `libgfortran` 5.
-    """
-    string_flag(
-        name = name,
-        values = ["3", "4", "5"],
-        build_setting_default = "5",
-    )
-
-def cxxstring_abi(name = "cxxstring_abi"):
-    """The C++ `std::string` ABI Julia artifacts are selected for.
-
-    Artifacts with C++ code are published for both the pre-GCC 5 (`cxx03`)
-    and the modern (`cxx11`) ABI. Official Julia binaries use `cxx11`.
-    """
-    string_flag(
-        name = name,
-        values = ["cxx03", "cxx11"],
-        build_setting_default = "cxx11",
-    )

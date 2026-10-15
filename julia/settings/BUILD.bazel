@@ -1,10 +1,7 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(
     ":settings.bzl",
-    "cxxstring_abi",
     "formatter_config",
-    "libc",
-    "libgfortran_version",
     "linker",
     "version",
 )
@@ -26,9 +23,3 @@ formatter_config()
 linker()
 
 version()
-
-libc()
-
-libgfortran_version()
-
-cxxstring_abi()

@@ -88,7 +88,7 @@ def _emit_sysimage_object(ctx, *, contents, toolchain_info):
         "--cpu-target=" + (ctx.attr.cpu_target or toolchain_info.cpu_target),
         "--sysimage=" + toolchain_info.sysimage.path,
         "--output-o=" + archive.path,
-    ]
+    ] + julia_common.codegen_flags(ctx, toolchain_info)
 
     julia_common.run_driver(
         ctx,

@@ -2,7 +2,7 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load("//julia/pkg/private:artifacts_toml.bzl", "parse_artifacts_toml")
-load("//julia/private:platforms.bzl", "choose_variants", "config_setting_text", "selection_key")
+load("//julia/private:platforms.bzl", "abi_suffix", "choose_variants", "config_setting_text", "match_abi", "select_abi_variant", "selection_key")
 
 _ARTIFACTS = """\
 [[Bzip2]]
@@ -136,24 +136,24 @@ _parse_test = unittest.make(_parse_test_impl)
 def _selection_key_test_impl(ctx):
     env = unittest.begin(ctx)
 
+    # ABI tags do not take part in the platform key; they are matched against
+    # the toolchain at analysis time.
     key = selection_key({"arch": "x86_64", "cxxstring_abi": "cxx11", "libc": "glibc", "libgfortran_version": "5.0.0", "os": "linux"})
     asserts.true(env, key.supported)
-    asserts.equals(env, "platform__linux_x86_64_glibc_libgfortran5_cxx11", key.name)
+    asserts.equals(env, "platform__linux_x86_64_glibc", key.name)
     asserts.equals(env, ["@platforms//os:linux", "@platforms//cpu:x86_64"], key.constraint_values)
-    asserts.equals(
-        env,
-        {
-            "@rules_julia//julia/settings:cxxstring_abi": "cxx11",
-            "@rules_julia//julia/settings:libc": "glibc",
-            "@rules_julia//julia/settings:libgfortran_version": "5",
-        },
-        key.flag_values,
-    )
+    asserts.equals(env, {}, key.flag_values)
 
     # `call_abi` is ignored; unknown architectures are unsupported.
     asserts.true(env, selection_key({"arch": "armv7l", "call_abi": "eabihf", "libc": "glibc", "os": "linux"}).supported)
     asserts.false(env, selection_key({"arch": "armv6l", "call_abi": "eabihf", "libc": "glibc", "os": "linux"}).supported)
     asserts.false(env, selection_key({"arch": "x86_64", "os": "haiku"}).supported)
+
+    # Only glibc is selectable on Linux until a libc constraint exists.
+    asserts.false(env, selection_key({"arch": "x86_64", "libc": "musl", "os": "linux"}).supported)
+
+    # Unknown ABI values are unsupported.
+    asserts.false(env, selection_key({"arch": "x86_64", "libgfortran_version": "9.0.0", "os": "linux"}).supported)
 
     # Platform independent.
     independent = selection_key({})
@@ -164,6 +164,9 @@ def _selection_key_test_impl(ctx):
     asserts.true(env, "name = \"platform__macos_aarch64\"" in text)
     asserts.true(env, "@platforms//cpu:aarch64" in text)
     asserts.false(env, "flag_values" in text)
+
+    asserts.equals(env, "libgfortran5_cxx11", abi_suffix({"cxxstring_abi": "cxx11", "libgfortran_version": "5.0.0", "os": "linux"}))
+    asserts.equals(env, "any", abi_suffix({"arch": "x86_64", "os": "linux"}))
 
     return unittest.end(env)
 
@@ -176,30 +179,24 @@ def _choose_variants_test_impl(ctx):
 
     bzip2 = choose_variants(artifacts["Bzip2"])
     asserts.equals(env, ["platform__linux_x86_64_glibc", "platform__macos_x86_64"], sorted(bzip2.selected.keys()))
-    asserts.equals(env, "a1", bzip2.selected["platform__linux_x86_64_glibc"].variant["sha256"])
+    asserts.equals(env, ["a1"], [v["sha256"] for v in bzip2.selected["platform__linux_x86_64_glibc"].variants])
     asserts.equals(env, 1, len(bzip2.skipped))
     asserts.equals(env, "unsupported arch `armv6l`", bzip2.skipped[0][1])
 
-    # Distinct ABI flags produce distinct keys.
+    # ABI variants of one platform are all offered; the toolchain decides.
     fortran = choose_variants(artifacts["Fortran"])
-    asserts.equals(
-        env,
-        ["platform__linux_x86_64_glibc_libgfortran3", "platform__linux_x86_64_glibc_libgfortran5"],
-        sorted(fortran.selected.keys()),
-    )
+    asserts.equals(env, ["platform__linux_x86_64_glibc"], fortran.selected.keys())
+    asserts.equals(env, ["f3", "f5"], sorted([v["sha256"] for v in fortran.selected["platform__linux_x86_64_glibc"].variants]))
 
     # Variants differing only in unmodeled tags collapse to the highest version.
     cxx = choose_variants(artifacts["Cxx"])
-    asserts.equals(env, ["platform__linux_x86_64_glibc_cxx11"], cxx.selected.keys())
-    asserts.equals(env, "c30", cxx.selected["platform__linux_x86_64_glibc_cxx11"].variant["sha256"])
+    asserts.equals(env, ["c30"], [v["sha256"] for v in cxx.selected["platform__linux_x86_64_glibc"].variants])
     asserts.equals(env, 1, len(cxx.skipped))
 
-    # Lazy artifacts are selected like any other; the package rule decides
-    # what to do on platforms without a variant.
+    # Lazy artifacts are offered where a variant exists.
     lazy = choose_variants(artifacts["Lazy"])
     asserts.equals(env, ["platform__linux_x86_64_glibc"], lazy.selected.keys())
-    asserts.equals(env, True, lazy.selected["platform__linux_x86_64_glibc"].variant["lazy"])
-    asserts.equals(env, [], lazy.skipped)
+    asserts.equals(env, True, lazy.selected["platform__linux_x86_64_glibc"].variants[0]["lazy"])
 
     # Platform independent artifacts select unconditionally.
     data = choose_variants(artifacts["Data"])
@@ -208,6 +205,37 @@ def _choose_variants_test_impl(ctx):
     return unittest.end(env)
 
 _choose_variants_test = unittest.make(_choose_variants_test_impl)
+
+def _abi_match_test_impl(ctx):
+    env = unittest.begin(ctx)
+
+    official = {"cxxstring_abi": "cxx11", "libgfortran_version": "5"}
+
+    # Tags on one side only match anything; tags on both sides must agree.
+    asserts.true(env, match_abi({}, official))
+    asserts.true(env, match_abi({"libgfortran_version": "5"}, official))
+    asserts.false(env, match_abi({"libgfortran_version": "3"}, official))
+    asserts.true(env, match_abi({"cxxstring_abi": "cxx11"}, {}))
+
+    candidates = [
+        struct(tags = {"libgfortran_version": "3"}, value = "f3"),
+        struct(tags = {"libgfortran_version": "5"}, value = "f5"),
+    ]
+    asserts.equals(env, "f5", select_abi_variant(candidates, official).value)
+    asserts.equals(env, "f3", select_abi_variant(candidates, {"libgfortran_version": "3"}).value)
+    asserts.equals(env, None, select_abi_variant(candidates, {"libgfortran_version": "4"}))
+
+    # The most specific match wins over a generic one.
+    mixed = [
+        struct(tags = {}, value = "generic"),
+        struct(tags = {"cxxstring_abi": "cxx11"}, value = "specific"),
+    ]
+    asserts.equals(env, "specific", select_abi_variant(mixed, official).value)
+    asserts.equals(env, "generic", select_abi_variant(mixed, {"cxxstring_abi": "cxx03"}).value)
+
+    return unittest.end(env)
+
+_abi_match_test = unittest.make(_abi_match_test_impl)
 
 def artifacts_test_suite(name):
     """Define the test suite.
@@ -220,4 +248,5 @@ def artifacts_test_suite(name):
         _parse_test,
         _selection_key_test,
         _choose_variants_test,
+        _abi_match_test,
     )

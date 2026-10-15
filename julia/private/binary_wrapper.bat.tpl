@@ -69,9 +69,13 @@ if not "%SYSIMAGE%"=="" (
     set "SYSIMAGE_FLAGS=--sysimage=!SYSIMAGE_PATH!"
 )
 
+@REM Flags for the interpreter itself: code generation settings, then `julia_flags`.
+set "JULIA_FLAGS={julia_flags}"
+
 @REM Execute Julia with the entrypoint
 "%INTERPRETER%" ^
     %SYSIMAGE_FLAGS% ^
+    %JULIA_FLAGS% ^
     --compiled-modules=%COMPILED_MODULES% ^
     "%ENTRYPOINT%" ^
     "%CONFIG%" ^

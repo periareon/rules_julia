@@ -14,3 +14,14 @@ JuliaInfo = provider(
         "transitive_srcs": "depset[File]: of all Julia source files including transitive deps",
     },
 )
+
+JuliaArtifactVariantInfo = provider(
+    doc = (
+        "One build of a Julia artifact. Several variants of the same artifact may be " +
+        "listed as dependencies; the one matching the toolchain's ABI is used."
+    ),
+    fields = {
+        "artifact_name": "str: The artifact's name in `Artifacts.toml`.",
+        "tags": "dict[str, str]: The variant's ABI tags (`libgfortran_version`, `cxxstring_abi`); empty when it fits any ABI.",
+    },
+)
