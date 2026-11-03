@@ -1,0 +1,14 @@
+load("//julia:julia_library.bzl", "julia_library")
+load("//julia:julia_test.bzl", "julia_test")
+
+julia_library(
+    name = "greeter_lib",
+    srcs = ["src/Greeter.jl"],
+    package_name = "Greeter",
+)
+
+julia_test(
+    name = "package_name_test",
+    srcs = ["package_name_test.jl"],
+    deps = [":greeter_lib"],
+)
