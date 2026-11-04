@@ -3,8 +3,8 @@ load("//julia:julia_test.bzl", "julia_test")
 
 julia_library(
     name = "greeter_lib",
-    srcs = ["src/Greeter.jl"],
     package_name = "Greeter",
+    srcs = ["src/Greeter.jl"],
 )
 
 julia_test(
