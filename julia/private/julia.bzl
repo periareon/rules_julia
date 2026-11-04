@@ -40,6 +40,7 @@ def _julia_library_impl(ctx):
         depot = julia_common.precompile(
             ctx,
             name = ctx.label.name,
+            package = ctx.attr.package_name or ctx.label.name,
             includes = includes,
             runfiles = runfiles,
             dep_depots = dep_depots,
@@ -51,7 +52,7 @@ def _julia_library_impl(ctx):
 
     return [
         JuliaInfo(
-            app_name = ctx.label.name,
+            app_name = ctx.attr.package_name or ctx.label.name,
             srcs = srcs,
             transitive_srcs = transitive_srcs,
             include = layout.include,

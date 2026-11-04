@@ -202,7 +202,7 @@ def _package_layout(ctx, srcs, data = []):
 
     path = "{}/{}".format(workspace_name, ctx.label.package).rstrip("/")
 
-    entry_name = ctx.label.name + ".jl"
+    entry_name = (ctx.attr.package_name or ctx.label.name) + ".jl"
     if "src/" + entry_name in rel_paths:
         src_layout = True
         entry = rel_paths["src/" + entry_name]
@@ -476,7 +476,7 @@ def _create_julia_binary_impl(
 
     return [
         JuliaInfo(
-            app_name = ctx.label.name,
+            app_name = ctx.attr.package_name or ctx.label.name,
             srcs = depset(srcs),
             transitive_srcs = transitive_srcs,
             include = layout.include,
@@ -579,12 +579,13 @@ def _run_driver(
         **kwargs
     )
 
-def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, artifact_depots = None):
+def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, artifact_depots = None, package = None):
     """Precompile a Julia package into a depot directory.
 
     Args:
         ctx: Rule context.
-        name (str): The package (module) name.
+        name (str): The name used for output files.
+        package (str): The package (module) name; defaults to name.
         includes (depset[str]): Include paths of the package and its dependencies.
         runfiles (runfiles): Runfiles of the package and its dependencies.
         dep_depots (depset[File]): Depots of dependencies.
@@ -609,7 +610,7 @@ def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, ar
     args.add("--config", config)
     args.add("--manifest", manifest)
     args.add("--depot", depot.path)
-    args.add("--package", name)
+    args.add("--package", package or name)
 
     _run_driver(
         ctx,
@@ -626,6 +627,9 @@ def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, ar
 
 # Attributes every rule using the build-time drivers needs.
 DRIVER_ATTRS = {
+    "package_name": attr.string(
+        doc = "Package name; picks the `<package_name>.jl` entry. Defaults to the target name.",
+    ),
     "_rules_julia_common": attr.label(
         default = Label("//julia/private:rules_julia_common.jl"),
         allow_single_file = True,
