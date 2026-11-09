@@ -2,6 +2,7 @@ load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//julia:julia_binary.bzl", "julia_binary")
+load(":wrapper_action_test.bzl", "wrapper_action_test")
 
 julia_binary(
     name = "writer",
@@ -32,4 +33,9 @@ diff_test(
     name = "writer_diff_test",
     file1 = ":writer_expected.txt",
     file2 = ":writer_output.txt",
+)
+
+wrapper_action_test(
+    name = "wrapper_action_test",
+    target_under_test = ":writer",
 )
