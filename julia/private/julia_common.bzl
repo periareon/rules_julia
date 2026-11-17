@@ -620,6 +620,9 @@ def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, ar
         outputs = [depot],
         mnemonic = "JuliaPrecompile",
         julia_flags = ["--compiled-modules=yes", "--pkgimages=yes"] + _codegen_flags(ctx, toolchain_info),
+        # Package images otherwise target the build host's CPU, which a
+        # machine with a different CPU (e.g. a remote executor) rejects.
+        env = {"JULIA_CPU_TARGET": toolchain_info.cpu_target},
     )
 
     return depot

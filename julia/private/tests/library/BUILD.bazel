@@ -1,7 +1,13 @@
 load("//julia:julia_library.bzl", "julia_library")
+load(":precompile_action_test.bzl", "precompile_cpu_target_test")
 
 julia_library(
     name = "writelib",
     srcs = ["src/writelib.jl"],
     visibility = ["//julia/private/tests:__subpackages__"],
+)
+
+precompile_cpu_target_test(
+    name = "precompile_cpu_target_test",
+    target_under_test = ":writelib",
 )
