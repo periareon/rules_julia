@@ -1,7 +1,19 @@
 load("//julia:julia_library.bzl", "julia_library")
+load(":precompile_action_test.bzl", "precompile_cpu_target_test")
 
 julia_library(
     name = "writelib",
     srcs = ["src/writelib.jl"],
     visibility = ["//julia/private/tests:__subpackages__"],
+)
+
+precompile_cpu_target_test(
+    name = "precompile_cpu_target_test",
+    # Julia 1.10 has no relocatable caches, so `julia_library` does not
+    # precompile and there is no action to check.
+    target_compatible_with = select({
+        "//julia/settings:version_1.10": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    target_under_test = ":writelib",
 )
