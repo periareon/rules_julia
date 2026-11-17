@@ -1,0 +1,3 @@
+load(":annotations_test.bzl", "annotations_test_suite")
+
+annotations_test_suite(name = "annotations_test_suite")
