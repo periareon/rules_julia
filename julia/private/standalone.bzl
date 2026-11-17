@@ -35,10 +35,11 @@ def _image_contents(ctx, deps):
         julia_info = dep[JuliaInfo]
         if not julia_info.entry:
             fail((
-                "{} must be a Julia package to be compiled into a system image: its entry " +
-                "point must be `{}.jl` (or `src/{}.jl`) under `{}` and define `module {}`."
-            ).format(dep.label, julia_info.app_name, julia_info.app_name, julia_info.include, julia_info.app_name))
-        packages.append(julia_info.app_name)
+                "{} must be a Julia package to be compiled into a system image: a root file " +
+                "`<name>.jl` or `src/<name>.jl` defining `module <name>`, named after the " +
+                "target or given by `entry`."
+            ).format(dep.label))
+        packages.append(julia_common.package_name(julia_info.entry))
         runfiles = runfiles.merge(julia_info.runfiles)
 
     return struct(
@@ -212,12 +213,12 @@ def _julia_standalone_binary_impl(ctx):
 
     binary = ctx.attr.binary
     julia_info = binary[JuliaInfo]
-    package = julia_info.app_name
     if not julia_info.entry:
         fail((
-            "{} must be a Julia package: its entry point must be `{}.jl` (or `src/{}.jl`) " +
-            "under `{}` and define `module {}` with a `julia_main()::Cint` function."
-        ).format(binary.label, package, package, julia_info.include, package))
+            "{} must be a Julia package: its `main` must be `<name>.jl` or `src/<name>.jl` " +
+            "defining `module <name>` with a `julia_main()::Cint` function."
+        ).format(binary.label))
+    package = julia_common.package_name(julia_info.entry)
 
     contents = _image_contents(ctx, [binary])
     archive = _emit_sysimage_object(ctx, contents = contents, toolchain_info = toolchain_info)

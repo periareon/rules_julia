@@ -157,8 +157,24 @@ def _version_gte(version, min_version):
     """Check if `version` >= `min_version` (dotted integer strings)."""
     return [int(p) for p in version.split(".")] >= [int(p) for p in min_version.split(".")]
 
-def _package_layout(ctx, srcs, data = []):
-    """Determine a target's include paths and package entry point.
+def _package_name(root):
+    """The package name of a target from its root file.
+
+    Args:
+        root (File): The root file, `<name>.jl` or `src/<name>.jl`.
+
+    Returns:
+        str: `<name>`, which is also the name of the root module.
+    """
+    return root.basename[:-len(".jl")] if root.basename.endswith(".jl") else root.basename
+
+def _package_layout(ctx, srcs, data = [], root = None):
+    """Determine a target's package name, include paths and entry point.
+
+    A target is one Julia package: a root file `<name>.jl` or `src/<name>.jl`
+    defining `module <name>`, from which every other source is reached with
+    `include`. The name is the target's unless `root` names the file, in
+    which case it is the file's basename.
 
     Julia resolves `using Foo` against each `LOAD_PATH` entry. A directory
     holding a `Project.toml` is a project environment: Julia identifies the
@@ -178,12 +194,15 @@ def _package_layout(ctx, srcs, data = []):
         ctx: Rule context.
         srcs: List of source files.
         data: List of data files; consulted for `Project.toml`.
+        root (File, optional): The package's root file, when it is not named
+            after the target. Must be one of `srcs`.
 
     Returns:
-        struct: `include` (str, relative to the runfiles root), `includes`
-            (list[str], every `LOAD_PATH` entry this target contributes, most
-            specific first) and `entry` (File or None), the `<name>.jl`
-            source if present.
+        struct: `name` (str, the package and root module name), `include`
+            (str, relative to the runfiles root), `includes` (list[str], every
+            `LOAD_PATH` entry this target contributes, most specific first)
+            and `entry` (File or None), the root file when it sits at
+            `<name>.jl` or `src/<name>.jl`.
     """
     workspace_name = ctx.label.workspace_name
     if not workspace_name:
@@ -202,16 +221,31 @@ def _package_layout(ctx, srcs, data = []):
 
     path = "{}/{}".format(workspace_name, ctx.label.package).rstrip("/")
 
-    entry_name = ctx.label.name + ".jl"
-    if "src/" + entry_name in rel_paths:
+    name = ctx.label.name
+    root_rel = None
+    if root != None:
+        name = _package_name(root)
+        for rel_path, src in rel_paths.items():
+            if src == root:
+                root_rel = rel_path
+                break
+
+    entry_name = name + ".jl"
+    entry = None
+    src_layout = False
+    if root != None:
+        if root_rel == "src/" + entry_name:
+            src_layout = True
+            entry = root
+        elif root_rel == entry_name:
+            entry = root
+    elif "src/" + entry_name in rel_paths:
         src_layout = True
         entry = rel_paths["src/" + entry_name]
     elif entry_name in rel_paths:
-        src_layout = False
         entry = rel_paths[entry_name]
-    else:
-        entry = None
-        src_layout = False
+
+    if entry == None:
         for rel_path in rel_paths:
             if rel_path.startswith("src/"):
                 src_layout = True
@@ -225,7 +259,7 @@ def _package_layout(ctx, srcs, data = []):
     else:
         includes = [path]
 
-    return struct(include = includes[0], includes = includes, entry = entry)
+    return struct(name = name, include = includes[0], includes = includes, entry = entry)
 
 def _includes_map(include):
     """Map function for formatting include paths."""
@@ -439,7 +473,9 @@ def _create_julia_binary_impl(
         transitive = [_collect_transitive_srcs(deps)],
     )
 
-    layout = _package_layout(ctx, srcs, data_files)
+    # A binary is the package rooted at `main`, so a standalone binary can
+    # `import` it whatever the target is called.
+    layout = _package_layout(ctx, srcs, data_files, root = main_file)
 
     includes = depset(
         layout.includes,
@@ -476,7 +512,6 @@ def _create_julia_binary_impl(
 
     return [
         JuliaInfo(
-            app_name = ctx.label.name,
             srcs = depset(srcs),
             transitive_srcs = transitive_srcs,
             include = layout.include,
@@ -654,6 +689,7 @@ julia_common = struct(
     select_artifacts = _select_artifacts,
     collect_artifact_depots = _collect_artifact_depots,
     package_layout = _package_layout,
+    package_name = _package_name,
     precompile = _precompile,
     run_driver = _run_driver,
     write_runfiles_manifest = _write_runfiles_manifest,

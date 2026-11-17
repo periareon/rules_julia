@@ -74,7 +74,9 @@ function main()
     found || error("Precompiling `$package` produced no cache files.")
     isempty(unexpected) || error(
         "Precompiling `$package` also compiled other packages, meaning their " *
-        "caches were stale or missing:\n  " * join(unexpected, "\n  "),
+        "caches were stale or missing:\n  " * join(unexpected, "\n  ") * "\n" *
+        "A package listed here that has no `julia_library` of its own is a " *
+        "second root module in this library's `srcs`; move it to its own target.",
     )
 end
 
