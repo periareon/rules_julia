@@ -19,7 +19,20 @@ def _julia_library_impl(ctx):
         transitive = [julia_common.collect_transitive_srcs(deps)],
     )
 
-    layout = julia_common.package_layout(ctx, ctx.files.srcs, data)
+    root = ctx.file.entry
+    if root and root not in ctx.files.srcs:
+        fail("`entry` was not found in `srcs`. Please add `{}` to `srcs` for {}".format(
+            root.short_path,
+            ctx.label,
+        ))
+
+    layout = julia_common.package_layout(ctx, ctx.files.srcs, data, root = root)
+    if root and layout.entry == None:
+        fail("`entry` of {} must be `{name}.jl` next to the BUILD file or `src/{name}.jl`, got `{}`".format(
+            ctx.label,
+            root.short_path,
+            name = layout.name,
+        ))
 
     includes = depset(
         layout.includes,
@@ -39,7 +52,7 @@ def _julia_library_impl(ctx):
     if _is_precompilable(ctx, layout):
         depot = julia_common.precompile(
             ctx,
-            name = ctx.label.name,
+            name = layout.name,
             includes = includes,
             runfiles = runfiles,
             dep_depots = dep_depots,
@@ -51,7 +64,6 @@ def _julia_library_impl(ctx):
 
     return [
         JuliaInfo(
-            app_name = ctx.label.name,
             srcs = srcs,
             transitive_srcs = transitive_srcs,
             include = layout.include,
@@ -86,7 +98,15 @@ def _is_precompilable(ctx, layout):
     )
 
 julia_library = rule(
-    doc = "A sharable Julia library or module.",
+    doc = (
+        "A sharable Julia library or module.\n\n" +
+        "A library is one Julia package: a root file `<name>.jl` or `src/<name>.jl` defining " +
+        "`module <name>` (see `entry`), from which every other source is reached with " +
+        "`include`. Nested modules are fine. A second source defining its own top-level " +
+        "module is another package and belongs in its own `julia_library`: left in `srcs` " +
+        "it can be loaded but is never precompiled, and precompiling this library fails " +
+        "if the root module `using`s it."
+    ),
     implementation = _julia_library_impl,
     attrs = {
         "data": attr.label_list(
@@ -97,12 +117,21 @@ julia_library = rule(
             doc = "Other Julia libraries this target depends on",
             providers = [JuliaInfo],
         ),
+        "entry": attr.label(
+            doc = (
+                "The package's root file, `<name>.jl` or `src/<name>.jl`, defining `module <name>`. " +
+                "Defaults to the source named after the target. Set it when the target name " +
+                "differs from the package name: `entry = \"src/Greeter.jl\"` on a target named " +
+                "`greeter_lib` makes the library `Greeter`. Must be one of `srcs`."
+            ),
+            allow_single_file = [".jl"],
+        ),
         "precompile": attr.bool(
             doc = (
                 "Precompile the library at build time. The resulting cache is placed on " +
                 "`DEPOT_PATH` for every binary and test that depends on this library. " +
-                "Requires the module entry point `<name>.jl` (typically `src/<name>.jl`) " +
-                "and Julia 1.11+; otherwise no cache is produced."
+                "Requires the package root file (see `entry`) and Julia 1.11+; otherwise " +
+                "no cache is produced."
             ),
             default = True,
         ),

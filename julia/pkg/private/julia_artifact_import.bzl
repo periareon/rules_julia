@@ -22,7 +22,6 @@ def _julia_artifact_import_impl(ctx):
             tags = ctx.attr.platform_tags,
         ),
         JuliaInfo(
-            app_name = ctx.attr.artifact_name,
             srcs = depset(),
             transitive_srcs = depset(),
             include = "",
