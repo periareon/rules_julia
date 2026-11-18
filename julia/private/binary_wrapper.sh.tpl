@@ -27,11 +27,12 @@ MAIN="$(rlocation "{main}")"
 runfiles_export_envvars
 
 # Remove noisy variables
-export -n -f "__runfiles_maybe_grep"
-export -n -f "rlocation"
-export -n -f "runfiles_current_repository"
-export -n -f "runfiles_export_envvars"
-export -n -f "runfiles_rlocation_checked"
+_exported_functions="$(declare -Fx)"
+while read -r _ _ fn; do
+    case "${fn}" in
+        __runfiles_* | rlocation | runfiles_*) export -n -f "${fn}" ;;
+    esac
+done <<<"${_exported_functions}"
 
 # Scratch depot for any run-time compilation. Never write into the output tree.
 if [ -n "${TEST_TMPDIR:-}" ]; then
