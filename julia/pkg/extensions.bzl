@@ -71,7 +71,7 @@ _install_tag = tag_class(
 _pkg_annotation_tag = tag_class(
     attrs = {
         "dep": attr.string(
-            doc = "The name of the package to annotate",
+            doc = "The name of the package to annotate. Use `<name>@<version>` to annotate only that version; it takes precedence over `<name>`.",
             mandatory = True,
         ),
         "patch_args": attr.string_list(

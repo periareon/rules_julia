@@ -444,6 +444,21 @@ def _artifact_repositories(*, hub, prefix, package, artifacts, pkg_server, confi
         text += " + " + select_text
     return text
 
+def package_annotations(annotations, name, version):
+    """Find the annotations of one package.
+
+    An annotation keyed by `<name>@<version>` wins over one keyed by `<name>`.
+
+    Args:
+        annotations (dict): Package annotations keyed by `<name>` or `<name>@<version>`.
+        name (str): The package name.
+        version (str): The package version.
+
+    Returns:
+        dict: The annotations of the package, or `None`.
+    """
+    return annotations.get("{}@{}".format(name, version)) or annotations.get(name)
+
 def _define_graph(*, attrs, prefix, minor, packages, annotations, config_settings):
     """Define the repositories of one package graph.
 
@@ -482,7 +497,7 @@ def _define_graph(*, attrs, prefix, minor, packages, annotations, config_setting
         deps = [dep for dep in all_deps if dep in all_package_names]
 
         repo_name = "{}__{}".format(prefix, package_name)
-        package_annotations = annotations.get(package_name)
+        annotation = package_annotations(annotations, package_name, version)
 
         artifact_deps = _artifact_repositories(
             hub = attrs.name,
@@ -511,13 +526,13 @@ def _define_graph(*, attrs, prefix, minor, packages, annotations, config_setting
             "urls": urls,
         }
 
-        if package_annotations:
-            if "patches" in package_annotations:
-                http_archive_args["patches"] = package_annotations["patches"]
-            if "patch_args" in package_annotations:
-                http_archive_args["patch_args"] = package_annotations["patch_args"]
-            if "patch_tool" in package_annotations:
-                http_archive_args["patch_tool"] = package_annotations["patch_tool"]
+        if annotation:
+            if "patches" in annotation:
+                http_archive_args["patches"] = annotation["patches"]
+            if "patch_args" in annotation:
+                http_archive_args["patch_args"] = annotation["patch_args"]
+            if "patch_tool" in annotation:
+                http_archive_args["patch_tool"] = annotation["patch_tool"]
 
         http_archive(**http_archive_args)
 
