@@ -57,6 +57,7 @@ def _julia_library_impl(ctx):
             runfiles = runfiles,
             dep_depots = dep_depots,
             toolchain_info = toolchain_info,
+            exec_toolchain_info = ctx.attr._julia_toolchain_exec[platform_common.ToolchainInfo],
             artifact_depots = artifact_depots,
         )
         depots = depset([depot], transitive = [dep_depots])
@@ -88,13 +89,21 @@ def _is_precompilable(ctx, layout):
 
     Returns:
         bool: True if precompilation is enabled, the library has a package
-            entry point, and the toolchain supports relocatable
-            (`@depot`-relative) caches, which requires Julia 1.11.
+            entry point, the toolchain supports relocatable
+            (`@depot`-relative) caches, which requires Julia 1.11, and the
+            execution platform's Julia is the target platform's Julia.
     """
+    toolchain_info = ctx.toolchains[TOOLCHAIN_TYPE]
+    exec_toolchain_info = ctx.attr._julia_toolchain_exec[platform_common.ToolchainInfo]
     return (
         ctx.attr.precompile and
         layout.entry != None and
-        julia_common.version_gte(ctx.toolchains[TOOLCHAIN_TYPE].version, "1.11.0")
+        julia_common.version_gte(toolchain_info.version, "1.11.0") and
+        # A package image is native code for the Julia that built it, so a
+        # cache built by another platform's Julia cannot be loaded on the
+        # target. `short_path` drops the configuration, so equal paths mean
+        # the same Julia distribution.
+        exec_toolchain_info.julia.short_path == toolchain_info.julia.short_path
     )
 
 julia_library = rule(
@@ -130,8 +139,8 @@ julia_library = rule(
             doc = (
                 "Precompile the library at build time. The resulting cache is placed on " +
                 "`DEPOT_PATH` for every binary and test that depends on this library. " +
-                "Requires the package root file (see `entry`) and Julia 1.11+; otherwise " +
-                "no cache is produced."
+                "Requires the package root file (see `entry`), Julia 1.11+ and the same " +
+                "Julia on the execution and target platforms; otherwise no cache is produced."
             ),
             default = True,
         ),
@@ -139,6 +148,12 @@ julia_library = rule(
             doc = "Julia source files (.jl files)",
             allow_files = [".jl"],
             mandatory = True,
+        ),
+        "_julia_toolchain_exec": attr.label(
+            doc = "The Julia toolchain of the execution platform, which runs the precompile step.",
+            cfg = "exec",
+            default = Label("//julia:current_julia_toolchain"),
+            providers = [platform_common.ToolchainInfo],
         ),
         "_precompiler": attr.label(
             default = Label("//julia/private:precompile.jl"),

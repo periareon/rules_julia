@@ -1,5 +1,5 @@
 load("//julia:julia_library.bzl", "julia_library")
-load(":precompile_action_test.bzl", "precompile_cpu_target_test")
+load(":precompile_action_test.bzl", "precompile_cpu_target_test", "precompile_cross_platform_test")
 
 julia_library(
     name = "writelib",
@@ -15,5 +15,10 @@ precompile_cpu_target_test(
         "//julia/settings:version_1.10": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    target_under_test = ":writelib",
+)
+
+precompile_cross_platform_test(
+    name = "precompile_cross_platform_test",
     target_under_test = ":writelib",
 )
