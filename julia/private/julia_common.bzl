@@ -614,7 +614,7 @@ def _run_driver(
         **kwargs
     )
 
-def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, artifact_depots = None):
+def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, exec_toolchain_info, artifact_depots = None):
     """Precompile a Julia package into a depot directory.
 
     Args:
@@ -623,7 +623,9 @@ def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, ar
         includes (depset[str]): Include paths of the package and its dependencies.
         runfiles (runfiles): Runfiles of the package and its dependencies.
         dep_depots (depset[File]): Depots of dependencies.
-        toolchain_info (ToolchainInfo): The Julia toolchain.
+        toolchain_info (ToolchainInfo): The Julia toolchain of the target platform.
+        exec_toolchain_info (ToolchainInfo): The Julia toolchain of the execution
+            platform, which runs the action.
         artifact_depots (depset[str]): Artifact depots of dependencies.
 
     Returns:
@@ -648,7 +650,7 @@ def _precompile(ctx, *, name, includes, runfiles, dep_depots, toolchain_info, ar
 
     _run_driver(
         ctx,
-        toolchain_info = toolchain_info,
+        toolchain_info = exec_toolchain_info,
         driver = ctx.file._precompiler,
         arguments = args,
         inputs = depset([config, manifest], transitive = [runfiles.files]),

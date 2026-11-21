@@ -101,8 +101,12 @@ julia_toolchain = rule(
             },
         ),
         "julia": attr.label(
-            doc = "The path to the Julia binary (julia or julia.exe).",
-            cfg = "exec",
+            doc = (
+                "The path to the Julia binary (julia or julia.exe). Built for the target " +
+                "platform, since binaries and tests run it there; rules that run Julia " +
+                "during the build use the toolchain resolved for the execution platform."
+            ),
+            cfg = "target",
             executable = True,
             mandatory = True,
         ),
