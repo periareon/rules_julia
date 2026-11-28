@@ -156,14 +156,33 @@ toolchain(
     toolchain_type = "@rules_julia//julia:toolchain_type",
     visibility = ["//visibility:public"],
 )
+
+alias(
+    name = "{name}_toolchain",
+    actual = "{toolchain}",
+    visibility = ["//visibility:public"],
+)
 """
 
-def _BUILD_for_toolchain_hub(
+def toolchain_hub_build_content(
         toolchain_names,
         toolchain_labels,
         target_compatible_with,
         exec_compatible_with,
         target_settings):
+    """Returns the BUILD file of a Julia toolchain hub repository.
+
+    Args:
+        toolchain_names (list[str]): The toolchain names, in registration order.
+        toolchain_labels (dict[str, str]): The toolchain implementation target, keyed by toolchain name.
+        target_compatible_with (dict[str, list[str]]): Target platform constraints, keyed by toolchain name.
+        exec_compatible_with (dict[str, list[str]]): Execution platform constraints, keyed by toolchain name.
+        target_settings (dict[str, list[str]]): Config settings, keyed by toolchain name.
+
+    Returns:
+        str: One `toolchain()` named after each toolchain and one `alias()`
+        named `<name>_toolchain` to its implementation target.
+    """
     return "\n".join([_BUILD_FILE_FOR_TOOLCHAIN_HUB_TEMPLATE.format(
         name = toolchain_name,
         exec_constraint_sets_serialized = json.encode(exec_compatible_with.get(toolchain_name, [])),
@@ -177,7 +196,7 @@ def _julia_toolchain_repository_hub_impl(repository_ctx):
         repository_ctx.name,
     ))
 
-    repository_ctx.file("BUILD.bazel", _BUILD_for_toolchain_hub(
+    repository_ctx.file("BUILD.bazel", toolchain_hub_build_content(
         toolchain_names = repository_ctx.attr.toolchain_names,
         toolchain_labels = repository_ctx.attr.toolchain_labels,
         target_compatible_with = repository_ctx.attr.target_compatible_with,
@@ -188,7 +207,10 @@ def _julia_toolchain_repository_hub_impl(repository_ctx):
 julia_toolchain_repository_hub = repository_rule(
     doc = (
         "Generates a toolchain-bearing repository that declares a set of Julia toolchains from other " +
-        "repositories. This exists to allow registering a set of toolchains in one go with the `:all` target."
+        "repositories. This exists to allow registering a set of toolchains in one go with the `:all` target. " +
+        "Each toolchain `<name>` also gets an `alias()` named `<name>_toolchain` that points at its " +
+        "implementation, to declare your own `toolchain()` targets, for example with other `target_settings`, " +
+        "instead of registering `:all`."
     ),
     attrs = {
         "exec_compatible_with": attr.string_list_dict(

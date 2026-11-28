@@ -1,6 +1,6 @@
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//julia:julia_toolchain.bzl", "julia_toolchain")
-load(":toolchain_test.bzl", "julia_cfg_test")
+load(":toolchain_test.bzl", "julia_cfg_test", "julia_hub_alias_test")
 
 # A generated `julia` so that its output path shows the configuration it was
 # built in.
@@ -21,4 +21,8 @@ julia_toolchain(
 julia_cfg_test(
     name = "julia_cfg_test",
     target_under_test = ":fake_toolchain",
+)
+
+julia_hub_alias_test(
+    name = "julia_hub_alias_test",
 )
