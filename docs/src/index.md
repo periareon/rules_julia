@@ -30,6 +30,12 @@ julia.toolchain(version = "1.11.9")
 bazel build --@rules_julia//julia/settings:version=1.11.9 //...
 ```
 
+Each toolchain in `@julia_toolchains`, such as
+`julia_1.12.5_x86_64_linux_gnu`, also has an alias named
+`<toolchain>_toolchain` that points at its implementation. To declare your own
+`toolchain()` targets, for example with other `target_settings`, use the alias
+instead of registering `@julia_toolchains//:all`.
+
 ### Compilation mode
 
 Optimization level, bounds checking and debug info follow `--compilation_mode`
